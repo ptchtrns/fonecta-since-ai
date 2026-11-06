@@ -96,11 +96,26 @@ def load_reviews():
     return by_business
 
 
-def load_everything():
-    """Loads every data file once. Returns a dict, e.g. data["businesses"]["FI-D0001"]"""
+def group_by_date(holiday_history):
+    """Returns {(business_id, date): [entries for that exact date, oldest first]}"""
+    by_date = defaultdict(list)
+    for entries in holiday_history.values():
+        for entry in entries:
+            by_date[(entry["entity_id"], entry["date"])].append(entry)
+    return by_date
+
+
+def load_everything(snapshot="2026-11-06"):
+    """Loads every data file once. Returns a dict, e.g. data["businesses"]["FI-D0001"]
+
+    snapshot is the "today" of the run: 2026-11-06 for the real season, 2025-11-06 for the back-test.
+    """
+    holiday_history = load_holiday_history()
     return {
+        "snapshot": snapshot,
         "businesses": load_businesses(),
-        "holiday_history": load_holiday_history(),
+        "holiday_history": holiday_history,
+        "holiday_history_by_date": group_by_date(holiday_history),
         "regular_hours_history": load_regular_hours_history(),
         "peers": load_peers(),
         "city_sizes": load_city_sizes(),
