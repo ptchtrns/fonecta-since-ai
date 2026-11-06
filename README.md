@@ -106,10 +106,21 @@ If a new server-side package shows up in dev as "file does not exist ... optimiz
 
 ```sh
 pnpm db:migrate
-pnpm db:seed      # empties and refills the dataset tables, leaves app tables alone
+pnpm db:seed                       # demo set, local
+pnpm db:seed:full                  # everything, local
+pnpm --filter web db:seed:remote   # demo set, deployed database
 ```
 
-`apps/web/scripts/import_connect_data.py` also takes `--remote` and `--skip TABLE ...`. The full load is about 3.5M rows and 272 MB, of which `analytics_daily` is 3.1M rows. That fits D1's 500 MB free database size, but the free plan allows only [100,000 written rows a day](https://developers.cloudflare.com/d1/platform/limits/), and even without `analytics_daily` the load is about 351,000 rows. A deployed database therefore needs the paid plan or a smaller selection of tables.
+Each run empties and refills the dataset tables and leaves app tables alone.
+
+| Load     | Businesses | Rows | Size   | Est. rows written |
+| -------- | ---------- | ---- | ------ | ----------------- |
+| Demo set | 32         | 29k  | 3.4 MB | 61k               |
+| Full     | 3,032      | 3.5M | 272 MB | over 7M           |
+
+The demo set is the 17 demo businesses and 15 shopping centres. It keeps their full holiday history and reviews, limits analytics and daily weather to 1 Nov 2025 onwards, and limits weather and peer data to what they use. It has no `dev` or `test` businesses, so the `dev_*` tables stay empty and the 2025 back-test targets aren't loaded. Work across all businesses, such as producing `predictions_2026.csv`, has to read the files in `data/`.
+
+D1's free plan allows [100,000 written rows a day](https://developers.cloudflare.com/d1/platform/limits/), and indexes count as writes. The demo set fits once a day. A second load on the same day probably won't, because deleting the old rows counts too. The full load needs the paid plan.
 
 The `dev_*` and `sim_truth` tables hold answers, so keep them out of anything that produces predictions.
 
@@ -132,15 +143,16 @@ Manual deploy: `pnpm db:migrate:remote` (from `apps/web`) and `pnpm deploy`.
 
 ## Scripts
 
-| Command            | What it does                                 |
-| ------------------ | -------------------------------------------- |
-| `pnpm dev`         | Dev server for apps/web                      |
-| `pnpm build`       | Production build                             |
-| `pnpm check`       | Format check, lint and type-aware checks     |
-| `pnpm db:generate` | Generate a migration from `src/db/schema.ts` |
-| `pnpm db:migrate`  | Apply migrations locally                     |
-| `pnpm db:seed`     | Load the Connect dataset into local D1       |
-| `pnpm deploy`      | Build and deploy with wrangler               |
+| Command             | What it does                                 |
+| ------------------- | -------------------------------------------- |
+| `pnpm dev`          | Dev server for apps/web                      |
+| `pnpm build`        | Production build                             |
+| `pnpm check`        | Format check, lint and type-aware checks     |
+| `pnpm db:generate`  | Generate a migration from `src/db/schema.ts` |
+| `pnpm db:migrate`   | Apply migrations locally                     |
+| `pnpm db:seed`      | Load the Connect demo set into local D1      |
+| `pnpm db:seed:full` | Load the whole Connect dataset into local D1 |
+| `pnpm deploy`       | Build and deploy with wrangler               |
 
 In `apps/web`, `pnpm cf-typegen` regenerates `worker-configuration.d.ts` after changing `wrangler.jsonc`, and `pnpm preview` runs the production build locally.
 

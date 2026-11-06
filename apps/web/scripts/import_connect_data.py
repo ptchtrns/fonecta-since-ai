@@ -5,8 +5,13 @@
 # ///
 """Load the Connect Suggests dataset into D1.
 
-    pnpm db:migrate && pnpm db:seed             # local
-    uv run --script scripts/import_connect_data.py --remote --skip analytics_daily
+    pnpm db:migrate && pnpm db:seed             # demo set, local
+    pnpm db:seed:full                           # everything, local
+    pnpm --filter web db:seed:remote            # demo set, deployed database
+
+The demo set is small enough for D1's free plan: the demo businesses and shopping centres, with weather and
+peer data limited to what they use, and analytics and daily weather limited to SUBSET_SINCE onwards. Use
+--all for everything (3.5M rows, 272 MB).
 
 Every dataset table is emptied and refilled, so it is safe to re-run. App tables (user, job, ...) are not
 touched. Wrangler runs the generated SQL, so run this from anywhere; it switches to apps/web itself.
@@ -28,6 +33,10 @@ DEFAULT_DATA_DIR = WEB_DIR.parents[1] / "data" / "fonecta-connect-suggests-2026"
 # D1 rejects statements over 100 KB. A file is one `wrangler d1 execute` call.
 MAX_STATEMENT_BYTES = 90_000
 MAX_FILE_BYTES = 64 * 1024 * 1024
+
+# The demo set: which businesses, and how far back its daily tables go. This keeps last year's holidays.
+SUBSET_SPLITS = ("demo", "reference")
+SUBSET_SINCE = "2025-11-01"
 
 data_dir = DEFAULT_DATA_DIR
 
@@ -434,6 +443,28 @@ TABLES = {
 }
 
 
+def subset_filter():
+    """Return a predicate (table, row) -> bool that keeps only what the demo set needs."""
+    tiers = {r["city"]: r["city_tier"] for r in read_csv("data/cities.csv")}
+    ids = {r["entity_id"] for r in read_csv("data/splits.csv") if r["split"] in SUBSET_SPLITS}
+    chosen = [e for e in read_json("data/entities.json")["response"]["entities"] if e["meta"]["id"] in ids]
+    cities = {e["address"]["city"] for e in chosen}
+    peer_cells = {(e["meta"]["countryCode"], tiers[e["address"]["city"]], e["c_segment"]) for e in chosen}
+
+    def keep(table, row):
+        if table == "entity":
+            return row["id"] in ids
+        if table == "peer_benchmark":
+            return (row["country"], row["city_tier"], row["segment"]) in peer_cells
+        if table in ("weather_daily", "weather_normal") and row["city"] not in cities:
+            return False
+        if table in ("weather_daily", "analytics_daily") and row["date"] < SUBSET_SINCE:
+            return False
+        return "entity_id" not in row or row["entity_id"] in ids
+
+    return keep
+
+
 def sql_value(value):
     if value is None:
         return "NULL"
@@ -504,6 +535,7 @@ def main():
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--local", action="store_true", help="load the local D1 database")
     target.add_argument("--remote", action="store_true", help="load the deployed D1 database")
+    parser.add_argument("--all", action="store_true", help="load everything instead of the demo set")
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--persist-to", type=Path, help="local state directory, passed to wrangler")
     parser.add_argument("--skip", nargs="*", default=[], choices=TABLES, metavar="TABLE", help="tables to leave alone")
@@ -511,6 +543,7 @@ def main():
 
     data_dir = args.data_dir
     tables = {name: rows for name, rows in TABLES.items() if name not in args.skip}
+    keep = None if args.all else subset_filter()
 
     if args.remote:
         answer = input(f"This empties and refills {len(tables)} tables in the REMOTE database. Type 'yes': ")
@@ -527,7 +560,8 @@ def main():
         for name in reversed(list(tables)):
             files.write(f"DELETE FROM `{name}`;\n")
         for name, rows in tables.items():
-            statements = insert_statements(name, rows())
+            source = rows() if keep is None else (row for row in rows() if keep(name, row))
+            statements = insert_statements(name, source)
             while True:
                 try:
                     files.write(next(statements))

@@ -11,6 +11,7 @@
     "db:generate": "vp run web#db:generate",
     "db:migrate": "vp run web#db:migrate",
     "db:seed": "vp run --no-cache web#db:seed",
+    "db:seed:full": "vp run --no-cache web#db:seed:full",
     "deploy": "vp run web#deploy"
   },
   "devDependencies": {
