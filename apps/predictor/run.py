@@ -8,7 +8,8 @@ import csv
 import subprocess
 from pathlib import Path
 
-from clues import guess_from_last_year, guess_from_mall, guess_from_peers
+from clues import guess_from_last_year, guess_from_mall, guess_from_peers, guess_from_reviews
+from combine import combine
 from hours import shown_on_google_back_then, shown_on_google_now
 from load import load_everything
 
@@ -55,11 +56,12 @@ def main():
             else:
                 shown = shown_on_google_now(business, question["date"])
 
-            guess = (
-                guess_from_mall(data, business, question["date"])
-                or guess_from_last_year(data, business, question["day_key"], question["date"])
-                or guess_from_peers(data, business, question["day_key"])
-            )
+            guess = combine([
+                guess_from_mall(data, business, question["date"]),
+                guess_from_last_year(data, business, question["day_key"], question["date"]),
+                guess_from_reviews(data, business, question["day_key"]),
+                guess_from_peers(data, business, question["day_key"]),
+            ])
 
             if guess and guess["hours"] != shown:
                 writer.writerow([question["entity_id"], question["date"], "SUGGEST", guess["hours"], guess["confidence"]])
