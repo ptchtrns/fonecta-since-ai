@@ -1,3 +1,5 @@
+"""Reads the challenge data files and groups the rows so they can be looked up by business."""
+
 import csv
 import json
 from collections import defaultdict
@@ -7,7 +9,10 @@ DATA = Path(__file__).parents[2] / "data" / "fonecta-connect-suggests-2026" / "d
 
 
 def load_businesses():
-    """Returns {business_id: business}"""
+    """Load every business and shopping centre.
+
+    Returns {business_id: business}, where business is the entity from entities.json.
+    """
     with open(DATA / "entities.json", encoding="utf-8") as file:
         businesses = json.load(file)["response"]["entities"]
 
@@ -18,7 +23,11 @@ def load_businesses():
 
 
 def load_holiday_history():
-    """Returns {(business_id, holiday): [past entries, oldest first]}"""
+    """Load every special-day entry owners have made since 2024.
+
+    Returns {(business_id, holiday): [entries]}. Entries are in the order they were entered,
+    so when an owner changed their mind about a date, the later entry comes last.
+    """
     history = defaultdict(list)
 
     with open(DATA / "holiday_hours_history.jsonl", encoding="utf-8") as file:
@@ -33,7 +42,10 @@ def load_holiday_history():
 
 
 def load_regular_hours_history():
-    """Returns {business_id: [regular hours versions]}"""
+    """Load every published version of each business's normal weekly hours.
+
+    Returns {business_id: [versions]}, oldest first. The first version is always "before-2024".
+    """
     history = defaultdict(list)
 
     with open(DATA / "regular_hours_history.jsonl", encoding="utf-8") as file:
@@ -44,7 +56,10 @@ def load_regular_hours_history():
 
 
 def load_peers():
-    """Returns {(country, city_size, business_type, holiday): stats}"""
+    """Load what similar businesses entered on each holiday.
+
+    Returns {(country, city_size, business_type, holiday): stats}. All stats are strings.
+    """
     peers = {}
 
     with open(DATA / "peer_benchmarks.csv", encoding="utf-8") as file:
@@ -55,7 +70,7 @@ def load_peers():
 
 
 def load_city_sizes():
-    """Returns {city_name: city_size}  e.g. {"Helsinki": "capital"}"""
+    """Load the size class of each city, e.g. {"Helsinki": "capital"}."""
     city_sizes = {}
 
     with open(DATA / "cities.csv", encoding="utf-8") as file:
@@ -65,7 +80,7 @@ def load_city_sizes():
 
 
 def load_holiday_dates():
-    """Returns {(country, holiday): [dates]}  e.g. {("FI", "XMAS_EVE"): ["2024-12-24", ...]}"""
+    """Load the date of each holiday in every year, e.g. {("FI", "XMAS_EVE"): ["2024-12-24", ...]}."""
     dates = defaultdict(list)
 
     with open(DATA / "calendar_special_days.csv", encoding="utf-8") as file:
@@ -75,7 +90,10 @@ def load_holiday_dates():
 
 
 def load_google_user_edits():
-    """Returns {business_id: [edits suggested by Google users]}"""
+    """Load the edits Google, Apple and Bing users have suggested.
+
+    Returns {business_id: [edits]}. Roughly half of them are wrong.
+    """
     with open(DATA / "publisher_suggestions.json", encoding="utf-8") as file:
         edits = json.load(file)["response"]["suggestions"]
 
@@ -86,7 +104,7 @@ def load_google_user_edits():
 
 
 def load_reviews():
-    """Returns {business_id: [reviews]}"""
+    """Load customer reviews, returned as {business_id: [reviews]}."""
     with open(DATA / "reviews.json", encoding="utf-8") as file:
         reviews = json.load(file)["response"]["reviews"]
 
@@ -97,7 +115,10 @@ def load_reviews():
 
 
 def group_by_date(holiday_history):
-    """Returns {(business_id, date): [entries for that exact date, oldest first]}"""
+    """Regroup the holiday history by exact date instead of by holiday.
+
+    Returns {(business_id, date): [entries]}, in the order they were entered.
+    """
     by_date = defaultdict(list)
     for entries in holiday_history.values():
         for entry in entries:
@@ -105,10 +126,10 @@ def group_by_date(holiday_history):
     return by_date
 
 
-def load_everything(snapshot="2026-11-06"):
-    """Loads every data file once. Returns a dict, e.g. data["businesses"]["FI-D0001"]
+def load_everything(snapshot):
+    """Load every data file once into one dict, e.g. data["businesses"]["FI-D0001"].
 
-    snapshot is the "today" of the run: 2026-11-06 for the real season, 2025-11-06 for the back-test.
+    snapshot is the date the run pretends is today. Nothing entered after it may be used.
     """
     holiday_history = load_holiday_history()
     return {

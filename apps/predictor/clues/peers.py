@@ -1,8 +1,16 @@
+"""Clue: for businesses with no history, follow what similar businesses do."""
+
+# Guess "closed" only when at least this share of similar businesses entered closed.
+# 0.2 scored best on both seasons; lower values cause too many wrong "closed" guesses.
 MIN_SHARE_CLOSED = 0.2
 
 
 def guess_from_peers(data, business, holiday):
-    """Guesses "closed" when enough similar businesses (same country, city size, type) close on this holiday."""
+    """Suggest "closed" when enough similar businesses close on this holiday.
+
+    Similar means the same country, city size and business type. Never suggests opening hours:
+    peers' typical hours lost points in testing, because most owners keep their normal hours.
+    """
     country = business["meta"]["countryCode"]
     city_size = data["city_sizes"].get(business["address"]["city"])
     business_type = business["c_segment"]

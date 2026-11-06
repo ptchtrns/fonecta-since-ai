@@ -1,11 +1,12 @@
+"""Opening-hours helpers: converting the data's hours format and working out what Google shows."""
+
 from datetime import date
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-TODAY = "2026-11-06"
 
 
 def hours_to_text(hours):
-    """Turns the data's hours format into text like "10:00-14:00,17:00-22:00" or "closed"."""
+    """Convert one day's hours from the data's format to text, e.g. "10:00-14:00,17:00-22:00" or "closed"."""
     if not hours or hours.get("isClosed") or not hours.get("openIntervals"):
         return "closed"
 
@@ -17,36 +18,30 @@ def hours_to_text(hours):
 
 
 def weekday_of(day):
+    """Return the weekday name used in the data, e.g. "2026-12-24" -> "thursday"."""
     return WEEKDAYS[date.fromisoformat(day).weekday()]
 
 
 def normal_hours(data, business, day, as_of=None):
-    """The business's normal hours for the weekday of this day, as published on as_of (default: the snapshot)."""
+    """Return the business's normal hours for the weekday of this day.
+
+    Uses the weekly hours that were published on as_of, which defaults to the snapshot date.
+    """
     as_of = as_of or data["snapshot"]
-    published = [
-        version for version in data["regular_hours_history"][business["meta"]["id"]]
-        if version["effective_from"] == "before-2024" or version["effective_from"] < as_of
-    ]
-    newest = max(published, key=lambda version: version["effective_from"].replace("before-2024", "0000"))
-    return hours_to_text(newest["hours"].get(weekday_of(day)))
+
+    published = None
+    for version in data["regular_hours_history"][business["meta"]["id"]]:
+        if version["effective_from"] == "before-2024" or version["effective_from"] < as_of:
+            published = version
+
+    return hours_to_text(published["hours"].get(weekday_of(day)))
 
 
-def shown_on_google(data, business, day):
-    """What Google showed for this business on this day, as of the snapshot date."""
-    if data["snapshot"] == TODAY:
-        return shown_on_google_today(business, day)
+def shown_on_google_now(business, day):
+    """Return what Google shows for this day, according to entities.json.
 
-    special_days = [
-        entry for entry in data["holiday_history_by_date"][(business["meta"]["id"], day)]
-        if entry["entered_at"] < data["snapshot"]
-    ]
-    if special_days and not special_days[-1]["holidayHours"].get("isRegularHours"):
-        return hours_to_text(special_days[-1]["holidayHours"])
-
-    return normal_hours(data, business, day)
-
-
-def shown_on_google_today(business, day):
+    entities.json is a picture of the listings on 6 Nov 2026, so this only works for the 2026 season.
+    """
     hours = business["hours"]
     closed_for_good = business.get("closed")
     on_seasonal_break = hours.get("reopenDate") and day < hours["reopenDate"]
@@ -59,3 +54,22 @@ def shown_on_google_today(business, day):
             return hours_to_text(special_day)
 
     return hours_to_text(hours.get(weekday_of(day)))
+
+
+def shown_on_google_back_then(data, business, day):
+    """Return what Google showed for this day on the snapshot date, rebuilt from the history files.
+
+    Used for the 2025 back-test. It can't see closed-for-good or seasonal-break flags, which only
+    exist for today, so it is slightly less exact than shown_on_google_now.
+    """
+    entries_for_this_day = data["holiday_history_by_date"][(business["meta"]["id"], day)]
+
+    special_hours = None
+    for entry in entries_for_this_day:
+        if entry["entered_at"] < data["snapshot"]:
+            special_hours = entry["holidayHours"]
+
+    if special_hours and not special_hours.get("isRegularHours"):
+        return hours_to_text(special_hours)
+
+    return normal_hours(data, business, day)

@@ -1,10 +1,17 @@
+"""Clue: repeat what the owner entered for the same holiday in earlier years."""
+
 from hours import hours_to_text, normal_hours
 
+# How much each earlier year counts compared with the year after it, when measuring confidence.
+# Below 1 so that a recent change of habit outweighs many old years.
 YEAR_WEIGHT_DECAY = 0.7
 
 
 def guess_from_last_year(data, business, holiday, day):
-    """Suggests what the owner entered for this holiday most recently."""
+    """Suggest the hours the owner entered for this holiday most recently.
+
+    Returns None if the owner has never entered anything for this holiday.
+    """
     answers = answers_per_year(data, business, holiday)
     if not answers:
         return None
@@ -23,8 +30,12 @@ def guess_from_last_year(data, business, holiday, day):
 
 
 def answers_per_year(data, business, holiday):
-    """What the owner entered for this holiday each year, oldest first, as (date, answer).
-    "regular" means normal hours."""
+    """List what the owner entered for this holiday in each earlier year.
+
+    Returns [(date, answer)], oldest first. The answer is hours text like "10:00-17:00",
+    "closed", or "regular" when the owner said normal hours. Entries made after the snapshot
+    are ignored.
+    """
     business_id = business["meta"]["id"]
     snapshot = data["snapshot"]
 
@@ -40,11 +51,13 @@ def answers_per_year(data, business, holiday):
 
 
 def adjust_to_this_weekday(data, business, past_hours, past_date, day):
-    """If last time the owner kept that weekday's normal opening or closing time,
-    keep this weekday's normal time instead.
+    """Move last year's hours onto this year's weekday.
 
-    Example: normal hours Sunday 12-18, Thursday 10-20. Last NYE (a Sunday) was 12-17.
-    This NYE is a Thursday, so the guess is 10-17, not 12-17.
+    Where last year's opening or closing time was simply that weekday's normal time, use this
+    weekday's normal time instead.
+
+    Example: normal hours are Sunday 12-18 and Thursday 10-20. Last NYE was a Sunday and the
+    owner entered 12-17. This NYE is a Thursday, so the guess is 10-17, not 12-17.
     """
     normal_then = normal_hours(data, business, past_date, as_of=past_date)
     normal_now = normal_hours(data, business, day)
@@ -67,7 +80,10 @@ def adjust_to_this_weekday(data, business, past_hours, past_date, day):
 
 
 def how_much_years_agree(answers, newest):
-    """Share of years that agree with the newest one. Recent years count more."""
+    """Return how many of the years agree with the newest answer, from 0 to 1.
+
+    Recent years count more (see YEAR_WEIGHT_DECAY).
+    """
     total = 0
     agreeing = 0
     weight = 1

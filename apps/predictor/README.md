@@ -20,11 +20,11 @@ A change should improve **both** seasons. The organisers score hidden businesses
 | File | What it does | Status |
 |---|---|---|
 | `load.py` | Reads every data file once and groups the rows by business | Done |
-| `hours.py` | `shown_on_google(data, business, day)`: what Google showed on the snapshot date. Matches the labels exactly for 2026; 27 of 11,118 rows differ for 2025 (seasonal businesses) | Done |
-| `run.py` | Goes through every question, asks the clues, writes predictions, prints the score | Working: last year, then peers |
+| `hours.py` | What Google shows: `shown_on_google_now` (2026, from entities.json, matches the labels exactly) and `shown_on_google_back_then` (2025 back-test, rebuilt from history, 27 of 11,118 rows differ). Also `normal_hours` | Done |
+| `run.py` | Goes through every question, asks the clues, writes predictions, prints the score | Working: mall, then last year, then peers |
 | `combine.py` | Picks the best guess from the clues, or none | Empty |
 | `clues/last_year.py` | Suggests the newest year's hours. Confidence = how much past years agree, recent years count more (`YEAR_WEIGHT_DECAY`). Adjusts for the holiday falling on a different weekday | Done |
-| `clues/mall.py` | Shop inside a mall: use the mall's hours | Empty |
+| `clues/mall.py` | Shop in a shopping centre that published hours for the day: suggest the centre's exact hours (shops did this ~250 times vs 6 times keeping their own opening time). Takes priority over last year | Done |
 | `clues/peers.py` | No history: guesses "closed" when enough similar businesses close | Done |
 | `clues/closed_for_good.py` | Reviews or Google edits say the business shut down: flag it | Empty |
 | `clues/reviews.py` | Reviews mentioning a specific holiday | Empty |
@@ -153,14 +153,16 @@ The `reason` text is reused in the messages sent to owners, so write it for a bu
 | 7 Nov | Last-year clue | 57.85 | — |
 | 7 Nov | + peers, "closed" only, when ≥ 20% of all similar businesses entered closed | 64.14 | 59.95 |
 | 7 Nov | Last year: confidence from all past years, weekday adjustment | 64.17 | 60.34 |
+| 7 Nov | + mall clue (centre's exact hours, before last year) | 64.58 | 61.40 |
 
 **Tried and dropped:**
 - Skipping last-year guesses with low confidence: lowered the score at every cut-off in both seasons. The newest year is right more often than not, even when years disagree.
 - Guessing peers' typical special hours (e.g. "10–13"), and using the closed share *among businesses that entered something*. Both lost points at every threshold (score fell to 42.66), because most businesses with no history keep their normal hours.
+- Applying peers' typical *change* to the business's own hours (e.g. "cafés close 5 h early on Christmas Eve"), learned from other businesses' past entries. Best result 62.63 (2026) and 59.56 (2025), both below the current code. Of 255 such suggestions on 2026 dev businesses, 212 went to owners who had kept their normal hours.
 
 ## Next steps
 
 1. `clues/closed_for_good.py`: flag shut-down businesses
-2. `clues/mall.py` + `combine.py`: first time two clues can disagree, so the confidence starts to matter
+2. `combine.py`: pick between clues by confidence; block suggestions an owner rejected in the 2025 pilot
 3. `clues/reviews.py`: AI reads reviews ("closed on Boxing Day")
 4. One `settings.py` for all tunable numbers

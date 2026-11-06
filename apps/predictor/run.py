@@ -1,10 +1,15 @@
+"""Answers every target question, writes the predictions file and scores it.
+
+Usage: python3 apps/predictor/run.py [--season 2026|2025]
+"""
+
 import argparse
 import csv
 import subprocess
 from pathlib import Path
 
-from clues import guess_from_last_year, guess_from_peers
-from hours import shown_on_google
+from clues import guess_from_last_year, guess_from_mall, guess_from_peers
+from hours import shown_on_google_back_then, shown_on_google_now
 from load import load_everything
 
 ROOT = Path(__file__).parents[2]
@@ -13,12 +18,14 @@ DATASET = ROOT / "data" / "fonecta-connect-suggests-2026"
 SEASONS = {
     "2026": {
         "snapshot": "2026-11-06",
+        "is_back_test": False,
         "questions": DATASET / "evaluation" / "targets_2026.csv",
         "answers": DATASET / "labels" / "dev_labels_2026.csv",
         "output": ROOT / "predictions_2026.csv",
     },
     "2025": {
         "snapshot": "2025-11-06",
+        "is_back_test": True,
         "questions": DATASET / "evaluation" / "targets_2025_backtest.csv",
         "answers": DATASET / "labels" / "dev_labels_2025_backtest.csv",
         "output": ROOT / "predictions_2025_backtest.csv",
@@ -27,6 +34,7 @@ SEASONS = {
 
 
 def main():
+    """Predict an action for each question in the season and run the official scorer on the result."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", choices=SEASONS, default="2026")
     season = SEASONS[parser.parse_args().season]
@@ -42,9 +50,14 @@ def main():
 
         for question in questions:
             business = data["businesses"][question["entity_id"]]
-            shown = shown_on_google(data, business, question["date"])
+            if season["is_back_test"]:
+                shown = shown_on_google_back_then(data, business, question["date"])
+            else:
+                shown = shown_on_google_now(business, question["date"])
+
             guess = (
-                guess_from_last_year(data, business, question["day_key"], question["date"])
+                guess_from_mall(data, business, question["date"])
+                or guess_from_last_year(data, business, question["day_key"], question["date"])
                 or guess_from_peers(data, business, question["day_key"])
             )
 
