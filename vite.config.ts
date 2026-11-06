@@ -13,10 +13,17 @@ export default defineConfig({
       '**/file-routes.d.ts',
       '**/drizzle/**',
       'apps/worker/**',
+      'data/**',
     ],
   },
   lint: {
     plugins: ['typescript'],
-    ignorePatterns: ['**/worker-configuration.d.ts', '**/file-routes.d.ts', '**/dist/**', 'apps/worker/**'],
+    ignorePatterns: [
+      '**/worker-configuration.d.ts',
+      '**/file-routes.d.ts',
+      '**/dist/**',
+      'apps/worker/**',
+      'data/**',
+    ],
   },
 });

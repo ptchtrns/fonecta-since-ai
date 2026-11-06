@@ -98,6 +98,32 @@ If a new server-side package shows up in dev as "file does not exist ... optimiz
 
 `POST /api/jobs` queues a job (`{ type, payload }`). The worker claims jobs through `POST /api/jobs/claim` and reports through `PATCH /api/jobs/:id`, authenticated with `WORKER_TOKEN`. Add job types as files in `apps/worker/worker/handlers/`. See `apps/worker/README.md`.
 
+## Connect Suggests dataset
+
+`data/fonecta-connect-suggests-2026/` holds the hackathon bundle, unchanged. Start with its `START_HERE.md`; the fields are described in `docs/DATA_DICTIONARY.md`. Attribution: "Connect Suggests simulator, Since AI ry 2026" (data CC BY 4.0, code MIT, see its `LICENSE.md`). All of it is synthetic.
+
+`src/db/schema.ts` has a table for each data source. To load them, with [uv](https://docs.astral.sh/uv/) installed:
+
+```sh
+pnpm db:migrate
+pnpm db:seed                       # demo set, local
+pnpm db:seed:full                  # everything, local
+pnpm --filter web db:seed:remote   # demo set, deployed database
+```
+
+Each run empties and refills the dataset tables and leaves app tables alone.
+
+| Load     | Businesses | Rows | Size   | Est. rows written |
+| -------- | ---------- | ---- | ------ | ----------------- |
+| Demo set | 32         | 29k  | 3.4 MB | 61k               |
+| Full     | 3,032      | 3.5M | 272 MB | over 7M           |
+
+The demo set is the 17 demo businesses and 15 shopping centres. It keeps their full holiday history and reviews, limits analytics and daily weather to 1 Nov 2025 onwards, and limits weather and peer data to what they use. It has no `dev` or `test` businesses, so the `dev_*` tables stay empty and the 2025 back-test targets aren't loaded. Work across all businesses, such as producing `predictions_2026.csv`, has to read the files in `data/`.
+
+D1's free plan allows [100,000 written rows a day](https://developers.cloudflare.com/d1/platform/limits/), and indexes count as writes. The demo set fits once a day. A second load on the same day probably won't, because deleting the old rows counts too. The full load needs the paid plan.
+
+The `dev_*` and `sim_truth` tables hold answers, so keep them out of anything that produces predictions.
+
 ## Deploying
 
 Pushing to `main` runs `.github/workflows/deploy.yml`: typecheck, build, create D1 and R2 on the first run, apply migrations, deploy.
@@ -117,14 +143,16 @@ Manual deploy: `pnpm db:migrate:remote` (from `apps/web`) and `pnpm deploy`.
 
 ## Scripts
 
-| Command            | What it does                                 |
-| ------------------ | -------------------------------------------- |
-| `pnpm dev`         | Dev server for apps/web                      |
-| `pnpm build`       | Production build                             |
-| `pnpm check`       | Format check, lint and type-aware checks     |
-| `pnpm db:generate` | Generate a migration from `src/db/schema.ts` |
-| `pnpm db:migrate`  | Apply migrations locally                     |
-| `pnpm deploy`      | Build and deploy with wrangler               |
+| Command             | What it does                                 |
+| ------------------- | -------------------------------------------- |
+| `pnpm dev`          | Dev server for apps/web                      |
+| `pnpm build`        | Production build                             |
+| `pnpm check`        | Format check, lint and type-aware checks     |
+| `pnpm db:generate`  | Generate a migration from `src/db/schema.ts` |
+| `pnpm db:migrate`   | Apply migrations locally                     |
+| `pnpm db:seed`      | Load the Connect demo set into local D1      |
+| `pnpm db:seed:full` | Load the whole Connect dataset into local D1 |
+| `pnpm deploy`       | Build and deploy with wrangler               |
 
 In `apps/web`, `pnpm cf-typegen` regenerates `worker-configuration.d.ts` after changing `wrangler.jsonc`, and `pnpm preview` runs the production build locally.
 

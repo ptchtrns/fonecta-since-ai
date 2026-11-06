@@ -13,6 +13,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:seed": "uv run --script scripts/import_connect_data.py --local",
+    "db:seed:full": "uv run --script scripts/import_connect_data.py --local --all",
+    "db:seed:remote": "uv run --script scripts/import_connect_data.py --remote",
     "deploy": "vp build && wrangler deploy"
   },
   "dependencies": {
