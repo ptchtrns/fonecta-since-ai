@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hackathon-web",
+  "main": "./src/worker.ts",
+  // 2026-08-04 or later enables nodejs_compat AsyncLocalStorage, which Solid's request scope needs.
+  "compatibility_date": "2026-10-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Without IDs, `wrangler deploy` provisions the D1 database and R2 bucket by name on first deploy.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hackathon-db",
+      "migrations_dir": "drizzle",
+      "migrations_pattern": "drizzle/*/migration.sql",
+    },
+  ],
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "hackathon-uploads" }],
+  // Secrets: BETTER_AUTH_SECRET, WORKER_TOKEN. Locally in .dev.vars, in production via `wrangler secret put`.
+}

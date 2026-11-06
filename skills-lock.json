@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "daisyui": {
+      "source": "saadeghi/daisyui",
+      "sourceType": "github",
+      "skillPath": "skills/daisyui/SKILL.md",
+      "computedHash": "f70b06883160802b5b04db0504647cc140bd38cf7eb941183a38f44a179b27ca"
+    },
+    "solidjs-v2": {
+      "source": "khmm12/solidjs-v2-skills",
+      "sourceType": "github",
+      "skillPath": "skills/solidjs-v2/SKILL.md",
+      "computedHash": "d924aa92e53b1d2b379559e33802a061e095688519ac575582d9cefbd7f73917"
+    }
+  }
+}

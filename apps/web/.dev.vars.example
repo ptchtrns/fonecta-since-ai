@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local development. Generate secrets with `openssl rand -base64 32`.
+BETTER_AUTH_SECRET=change-me-to-a-32-character-random-string
+WORKER_TOKEN=local-worker-token
+# Optional. Better Auth infers the base URL from the request when unset.
+# BETTER_AUTH_URL=http://localhost:3000

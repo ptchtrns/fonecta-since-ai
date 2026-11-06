@@ -1,0 +1,22 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Vite+ ships its own Vite core and Vitest; every package must resolve the same copies.
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vitest: 5.0.5
+
+# Solid 2 and better-auth release in lockstep bursts; fresh versions should install immediately.
+minimumReleaseAgeExclude:
+  - solid-js
+  - '@solidjs/*'
+  - filesystem-routing
+  - better-auth
+  - '@better-auth/*'
+
+allowBuilds:
+  '@solidjs/compiler': true
+  esbuild: true
+  sharp: true
+  workerd: true

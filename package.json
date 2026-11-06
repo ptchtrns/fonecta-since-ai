@@ -1,0 +1,22 @@
+{
+  "name": "hackathon-template",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp run web#dev",
+    "build": "vp run web#build",
+    "preview": "vp run web#preview",
+    "check": "vp check && vp run web#typecheck",
+    "db:generate": "vp run web#db:generate",
+    "db:migrate": "vp run web#db:migrate",
+    "deploy": "vp run web#deploy"
+  },
+  "devDependencies": {
+    "vite-plus": "1.4.0"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "packageManager": "pnpm@11.9.0"
+}
