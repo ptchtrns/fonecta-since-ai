@@ -10,6 +10,7 @@
     "check": "vp check && vp run web#typecheck",
     "db:generate": "vp run web#db:generate",
     "db:migrate": "vp run web#db:migrate",
+    "db:seed": "vp run --no-cache web#db:seed",
     "deploy": "vp run web#deploy"
   },
   "devDependencies": {

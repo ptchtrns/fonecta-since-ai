@@ -98,6 +98,21 @@ If a new server-side package shows up in dev as "file does not exist ... optimiz
 
 `POST /api/jobs` queues a job (`{ type, payload }`). The worker claims jobs through `POST /api/jobs/claim` and reports through `PATCH /api/jobs/:id`, authenticated with `WORKER_TOKEN`. Add job types as files in `apps/worker/worker/handlers/`. See `apps/worker/README.md`.
 
+## Connect Suggests dataset
+
+`data/fonecta-connect-suggests-2026/` holds the hackathon bundle, unchanged. Start with its `START_HERE.md`; the fields are described in `docs/DATA_DICTIONARY.md`. Attribution: "Connect Suggests simulator, Since AI ry 2026" (data CC BY 4.0, code MIT, see its `LICENSE.md`). All of it is synthetic.
+
+`src/db/schema.ts` has a table for each data source. To load them, with [uv](https://docs.astral.sh/uv/) installed:
+
+```sh
+pnpm db:migrate
+pnpm db:seed      # empties and refills the dataset tables, leaves app tables alone
+```
+
+`apps/web/scripts/import_connect_data.py` also takes `--remote` and `--skip TABLE ...`. The full load is about 3.5M rows and 272 MB, of which `analytics_daily` is 3.1M rows. That fits D1's 500 MB free database size, but the free plan allows only [100,000 written rows a day](https://developers.cloudflare.com/d1/platform/limits/), and even without `analytics_daily` the load is about 351,000 rows. A deployed database therefore needs the paid plan or a smaller selection of tables.
+
+The `dev_*` and `sim_truth` tables hold answers, so keep them out of anything that produces predictions.
+
 ## Deploying
 
 Pushing to `main` runs `.github/workflows/deploy.yml`: typecheck, build, create D1 and R2 on the first run, apply migrations, deploy.
@@ -124,6 +139,7 @@ Manual deploy: `pnpm db:migrate:remote` (from `apps/web`) and `pnpm deploy`.
 | `pnpm check`       | Format check, lint and type-aware checks     |
 | `pnpm db:generate` | Generate a migration from `src/db/schema.ts` |
 | `pnpm db:migrate`  | Apply migrations locally                     |
+| `pnpm db:seed`     | Load the Connect dataset into local D1       |
 | `pnpm deploy`      | Build and deploy with wrangler               |
 
 In `apps/web`, `pnpm cf-typegen` regenerates `worker-configuration.d.ts` after changing `wrangler.jsonc`, and `pnpm preview` runs the production build locally.
