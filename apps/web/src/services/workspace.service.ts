@@ -1,12 +1,12 @@
 import 'server-only';
-import { eq } from 'drizzle-orm';
-import { entity } from '~/db/schema';
+import { desc, eq } from 'drizzle-orm';
+import { entity, outbox } from '~/db/schema';
 import { weekToText } from '~/lib/hours';
 import { db } from '~/server/db';
 import { whatsappEnabled } from '~/server/whatsapp';
 import { publishes } from '~/server/yext';
 import { getBusiness } from '~/services/business.service';
-import { buildMessage, sendable } from '~/services/contact.service';
+import { buildMessage, canContactNow, channelFor, sendable } from '~/services/contact.service';
 import { builtInSources, listLinkedSources } from '~/services/sources.service';
 import { listSuggestions, upcomingExceptions } from '~/services/suggestions.service';
 import { syncYextBusiness } from '~/services/yext-business.service';
@@ -19,11 +19,12 @@ export async function getWorkspace(entityId: string, origin: string) {
   const business = await getBusiness(entityId);
   if (!business) return null;
 
-  const [suggestions, exceptions, linked, builtIn] = await Promise.all([
+  const [suggestions, exceptions, linked, builtIn, sent] = await Promise.all([
     listSuggestions(business),
     upcomingExceptions(business),
     listLinkedSources(entityId),
     builtInSources(business),
+    db.select().from(outbox).where(eq(outbox.entityId, entityId)).orderBy(desc(outbox.createdAt)).limit(5),
   ]);
 
   // The message the owner would get next, to show on the Integrations page.
@@ -68,6 +69,14 @@ export async function getWorkspace(entityId: string, origin: string) {
         buttons: message.buttons.map((b) => b.title),
         url: message.url,
       },
+    },
+    contact: {
+      optedOut: business.contact.optedOut,
+      channel: channelFor(business),
+      window: business.contact.window,
+      timeZone: business.contact.timeZone,
+      reachableNow: canContactNow(business),
+      sent: sent.map((m) => ({ channel: m.channel, recipient: m.recipient, body: m.body, at: m.createdAt })),
     },
     publishing: publishes(business.source),
   };

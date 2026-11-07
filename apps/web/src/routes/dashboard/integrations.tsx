@@ -3,6 +3,7 @@ import { revalidate, useBeforeLeave, type RouteDefinition } from '@solidjs/route
 import { createMemo, createSignal, For, onSettled, Show } from 'solid-js';
 import { FormField } from '~/components/FormField';
 import { FormMessage } from '~/components/FormMessage';
+import { ContactPreferences } from '~/components/connect/ContactPreferences';
 import { Page, PageHeader, Panel } from '~/components/connect/Page';
 import { BrandMark, PublisherLogo } from '~/components/connect/PublisherLogo';
 import { WhatsAppPreview } from '~/components/connect/WhatsAppPreview';
@@ -41,7 +42,11 @@ const levels: { value: Importance; title: string; text: string }[] = [
 const plannedChannels: { name: string; logo: string; text: string }[] = [
   { name: 'Text message', logo: 'SMS', text: 'For owners who don’t use a messaging app.' },
   { name: 'Email', logo: 'Email', text: 'Suggestions in your inbox.' },
-  { name: 'Messenger', logo: 'Messenger', text: 'Answer where your Facebook page’s messages already arrive.' },
+  {
+    name: 'Messenger',
+    logo: 'Messenger',
+    text: 'Answer where your Facebook page’s messages already arrive.',
+  },
   { name: 'Telegram', logo: 'Telegram', text: 'Answer suggestions with one tap in Telegram.' },
   { name: 'Signal', logo: 'Signal', text: 'Answer suggestions in Signal.' },
   { name: 'Viber', logo: 'Viber', text: 'Answer suggestions in Viber.' },
@@ -117,6 +122,8 @@ export default function Integrations() {
     <Page class="max-w-3xl">
       <Title>Integrations · Connecta AI</Title>
       <PageHeader title="Integrations" />
+
+      <ContactPreferences contact={workspace().contact} />
 
       <Panel>
         <form
@@ -324,7 +331,10 @@ export default function Integrations() {
         </form>
       </Panel>
 
-      <Panel title="Other channels" subtitle="Not available yet. WhatsApp is the only one for now.">
+      <Panel
+        title="Other channels"
+        subtitle="Not connected yet. For an owner who prefers one of these, messages are shown under How we reach you."
+      >
         <ul class="flex flex-col divide-y divide-base-300">
           <For each={plannedChannels}>
             {(channel) => (

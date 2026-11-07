@@ -151,6 +151,12 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/api/workspace/contact";
+      page: false;
+      $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/contact"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/contact")>>>;
+      $$route?: undefined;
+    },
+    {
       path: "/api/workspace/link";
       page: false;
       $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/link"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/link")>>>;
