@@ -32,7 +32,9 @@ describe('translateReason', () => {
     expect(translateReason(reasons[8]!, 'nb')).toContain('16:00');
   });
   test('closed on most special days is not mistaken for a seasonal break', () => {
-    expect(translateReason(reasons[13]!, 'en')).toBe('You were closed on most of the special days you have told us about.');
+    expect(translateReason(reasons[13]!, 'en')).toBe(
+      'You were closed on most of the special days you have told us about.',
+    );
   });
   test('unknown reasons are left out rather than sent in the wrong language', () => {
     expect(translateReason('Something new', 'fi')).toBeNull();

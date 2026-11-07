@@ -58,6 +58,18 @@ def load_questions(season):
     ).fetchall()
 
 
+def load_business_questions(season, business_id):
+    """The season's days for one business: its rows in the organisers' targets, or for a business from Yext,
+    the days load_yext_questions gives it."""
+    rows = database().execute(
+        "SELECT entity_id, date, day_key FROM evaluation_target WHERE season = ? AND entity_id = ? ORDER BY date",
+        (season, business_id),
+    ).fetchall()
+    if rows:
+        return rows
+    return [row for row in load_yext_questions(season) if row["entity_id"] == business_id]
+
+
 def load_yext_questions(season):
     """The season's special days for businesses taken on from the team's Yext account.
 
@@ -306,7 +318,9 @@ def load_reviews(snapshot):
 def load_owner_answers(snapshot, include_live_answers):
     """What owners answered to Connect's suggestions, so we don't ask them the same thing again.
 
-    Returns {"answered": {(business ID, date or "closed-for-good")}, "rejected": {(business ID, holiday): {hours}}}.
+    Returns {"answered": {(business ID, date or "closed-for-good")}, "rejected": {(business ID, holiday): {hours}},
+    "told": {business ID: [hours]}}. "told" holds the hours owners approved or edited in the web app this season,
+    which clues/owner.py counts like their own entries.
 
     Two sources:
     - The 2025 pilot, answered before the snapshot. Accepted and edited hours are already in the holiday
@@ -314,7 +328,7 @@ def load_owner_answers(snapshot, include_live_answers):
     - Answers given in the web app, only when include_live_answers is set: a back-test must not see
       answers from after its snapshot.
     """
-    answers = {"answered": set(), "rejected": defaultdict(set)}
+    answers = {"answered": set(), "rejected": defaultdict(set), "told": defaultdict(list)}
 
     rows = database().execute(
         """SELECT entity_id, day_key, suggested_hours FROM pilot_decision
@@ -326,7 +340,8 @@ def load_owner_answers(snapshot, include_live_answers):
 
     if include_live_answers:
         rows = database().execute(
-            """SELECT answer.entity_id, answer.suggestion_key, answer.status, answer.snapshot, calendar.day_key
+            """SELECT answer.entity_id, answer.suggestion_key, answer.status, answer.hours, answer.snapshot,
+                      calendar.day_key
                FROM suggestion_state answer
                JOIN entity business ON business.id = answer.entity_id
                LEFT JOIN calendar_special_day calendar
@@ -338,6 +353,8 @@ def load_owner_answers(snapshot, include_live_answers):
             suggested = json.loads(row["snapshot"])["suggested"]
             if row["status"] == "declined" and row["day_key"] and suggested:
                 answers["rejected"][(row["entity_id"], row["day_key"])].add(suggested)
+            if row["status"] in ("approved", "edited") and row["hours"]:
+                answers["told"][row["entity_id"]].append(row["hours"])
 
     return answers
 

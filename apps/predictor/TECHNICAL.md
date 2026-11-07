@@ -28,18 +28,18 @@ The `reason` is shown to the owner, so it is written for a business owner. The w
 
 Some clues also have an evidence function. It reports the numbers behind the clue even when the clue stays silent, for example the type's closed rate when it's only 45% and too low for a guess. The decider uses these numbers to judge the guesses. A value of -1 means there was nothing to go on.
 
-| File | Guess | Evidence for the decider |
-|---|---|---|
-| `clues/last_year.py` | The newest year's hours for this holiday, moved to this year's weekday when they followed the normal opening or closing time | Years of history, entries, years since the newest one, how much the years agree |
-| `clues/mall.py` | The shopping centre's published hours for the day | Past special days the shop used its centre's hours, and days it didn't |
-| `clues/reviews.py` | What a customer found on this holiday last time, read from the newest review about it by a language model | - |
-| `clues/peers.py` | Closed, when at least 20% of similar businesses entered closed | Every share in the peer benchmark |
-| `clues/type_habits.py` | Closed, for owners with no history for the holiday, when at least 80% of the type really closed | The type's closed rate and how many days it rests on |
-| `clues/google_edits.py` | Hours a Google user suggested for this holiday last time | - |
-| `clues/snow.py` | Closed, for ski rentals when there won't be enough snow | - |
-| `clues/seasonal_break.py` | Closed, during the business's or its type's yearly break | - |
-| `clues/owner.py` | Never guesses | How active the owner is: entries, entries in the last year, days since the latest one, how often they entered closed, Google edits, reviews |
-| `clues/closed_for_good.py` | A FLAG, not a guess: a recent review or Google user says the business has shut down | - |
+| File                       | Guess                                                                                                                        | Evidence for the decider                                                                                                                                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clues/last_year.py`       | The newest year's hours for this holiday, moved to this year's weekday when they followed the normal opening or closing time | Years of history, entries, years since the newest one, how much the years agree                                                                                                                                                 |
+| `clues/mall.py`            | The shopping centre's published hours for the day                                                                            | Past special days the shop used its centre's hours, and days it didn't                                                                                                                                                          |
+| `clues/reviews.py`         | What a customer found on this holiday last time, read from the newest review about it by a language model                    | -                                                                                                                                                                                                                               |
+| `clues/peers.py`           | Closed, when at least 20% of similar businesses entered closed                                                               | Every share in the peer benchmark                                                                                                                                                                                               |
+| `clues/type_habits.py`     | Closed, for owners with no history for the holiday, when at least 80% of the type really closed                              | The type's closed rate and how many days it rests on                                                                                                                                                                            |
+| `clues/google_edits.py`    | Hours a Google user suggested for this holiday last time                                                                     | -                                                                                                                                                                                                                               |
+| `clues/snow.py`            | Closed, for ski rentals when there won't be enough snow                                                                      | -                                                                                                                                                                                                                               |
+| `clues/seasonal_break.py`  | Closed, during the business's or its type's yearly break                                                                     | -                                                                                                                                                                                                                               |
+| `clues/owner.py`           | Never guesses                                                                                                                | How active the owner is: entries, entries in the last year, days since the latest one, how often they entered closed, Google edits, reviews. Hours the owner approved or edited in the web app this season count as entries too |
+| `clues/closed_for_good.py` | A FLAG, not a guess: a recent review or Google user says the business has shut down                                          | -                                                                                                                                                                                                                               |
 
 ## Features
 
@@ -67,19 +67,33 @@ When a run starts, `make_predict_function()` writes the trees out as one Python 
 
 For every training window it loads the data as it was on that window's snapshot date, runs the same `first_checks()` and `options_for()` as `run.py`, and scores every option the way the organisers' scorer would have. Those (features, points) rows are what the model learns from.
 
-| Window | Snapshot | Outcome from | Used for |
-|---|---|---|---|
-| Winter 2024 | 6 Nov 2024 | `dev_truth_history` | 2026 and 2025 |
-| Winter 2025 | 6 Nov 2025 | `dev_truth_history` | 2026 |
-| Springs 2024, 2025 | 15 Mar 2024, 1 Apr 2025 | `dev_truth_history` | 2026 and 2025 |
-| Spring 2026 | 20 Mar 2026 | `dev_truth_history` | 2026 |
-| 2025 pilot | 6 Nov 2025 | Owners' answers, businesses outside dev only | 2026 |
+| Window             | Snapshot                | Outcome from                                 | Used for      |
+| ------------------ | ----------------------- | -------------------------------------------- | ------------- |
+| Winter 2024        | 6 Nov 2024              | `dev_truth_history`                          | 2026 and 2025 |
+| Winter 2025        | 6 Nov 2025              | `dev_truth_history`                          | 2026          |
+| Springs 2024, 2025 | 15 Mar 2024, 1 Apr 2025 | `dev_truth_history`                          | 2026 and 2025 |
+| Spring 2026        | 20 Mar 2026             | `dev_truth_history`                          | 2026          |
+| 2025 pilot         | 6 Nov 2025              | Owners' answers, businesses outside dev only | 2026          |
 
 The back-test's model only learns from what was known on 6 Nov 2025: the pilot was answered in December 2025, so it isn't used there. In the pilot rows, an accepted or edited answer gives the true hours. A declined one only says the suggestion was wrong, so only the declined hours are scored, as if Google's hours had been right.
 
 `--check` measures what the hidden test businesses will see. It splits the dev businesses into five groups by ID, and decides each group with a model trained without that group's rows. The pilot rows are never held out, as they come from other businesses.
 
 The settings in `PARAMS` were chosen with `--check` on both seasons.
+
+## One business at a time
+
+`predict_business(business_id)` in `run.py` gives one business's 2026 predictions, loading the data again each time so the owner's latest answers are included. It takes about 3 seconds. `run.py --business FI-D0017` prints the same as JSON.
+
+The web app uses it to react to an owner's answer:
+
+1. `decide()` in `apps/web/src/services/suggestions.service.ts` records the answer and queues a `predict-business` job for the business (`queuePredictionRefresh` in `predictions.service.ts`).
+2. The worker (`apps/worker/worker/handlers/predict_business.py`) claims the job, calls `predict_business()` and reports the predictions as the job's result.
+3. When the job is reported done, `savePredictionRefresh` replaces the business's rows in the `prediction` table. Rows for days the owner has already answered stay, because the dashboard measures importance against them.
+
+`load_owner_answers()` reads the answers from the web app's `suggestion_state` table: an answered day is not asked again, declined hours are not suggested again for that holiday, and approved or edited hours count in the owner's evidence. That last part is what lets one answer change the other days.
+
+The predictor reads the web app's local database, so the worker has to run on the same machine as the dev server. For the deployed site the predictor would need to read its data through the web app's API instead.
 
 ## Adding a clue
 
@@ -99,27 +113,27 @@ from load import load_everything
 data = load_everything("2026-11-06")   # the date the run pretends is today; takes a few seconds
 ```
 
-| Key | Look up by | Example |
-|---|---|---|
-| `snapshot` | - | `"2026-11-06"`. Everything below only holds what was known before this date |
-| `businesses` | business ID | `data["businesses"]["FI-D0001"]` |
-| `holiday_history` | (business ID, holiday) | `data["holiday_history"][("FI-D0001", "XMAS_EVE")]`, in the order entered |
-| `holiday_history_by_date` | (business ID, date) | `data["holiday_history_by_date"][("FI-D0001", "2025-12-24")]` |
-| `holiday_history_by_business` | business ID | All of the business's entries |
-| `regular_hours_history` | business ID | `data["regular_hours_history"]["SE-D0016"]`, oldest first |
-| `peers` | (country, city size, business type, holiday) | `data["peers"][("FI", "capital", "cafe", "XMAS_EVE")]` |
-| `last_owner_entry` | business ID | The day the owner last entered any special hours |
-| `seasonal_types` | - | Business types whose businesses publish seasonal breaks, e.g. `{"seasonal_terrace", "ski_rental"}` |
-| `true_closures` | (country, business type, holiday) | `data["true_closures"][("FI", "hair_salon", "INTERDAY")]` gives `{business_id: [days, closed_days]}` |
-| `true_closures_by_month` | (business type, month) | The same, by month instead of holiday |
-| `holiday_on` | (country, date) | `data["holiday_on"][("FI", "2025-12-26")]` gives `"BOXING_DAY"` |
-| `day_types` | holiday | `data["day_types"]["XMAS_EVE"]` gives `"EVE"` |
-| `snow_depth` | (city, date) | Measured before the snapshot, or forecast for the 10 days after it |
-| `snow_chance` | (city, month, day) | Long-term chance of at least 10 cm of snow |
-| `city_sizes` | city name | `data["city_sizes"]["Helsinki"]` gives `"capital"` |
-| `google_user_edits` | business ID | `data["google_user_edits"]["FI-00187"]`. Their status may have been decided after the snapshot |
-| `reviews` | business ID | `data["reviews"]["FI-00001"]`. Each review has a `written_on` date |
-| `owner_answers` | - | `"answered"`: a set of (business ID, date, or "closed-for-good"); `"rejected"`: the hours rejected per (business ID, holiday) |
+| Key                           | Look up by                                   | Example                                                                                                                       |
+| ----------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `snapshot`                    | -                                            | `"2026-11-06"`. Everything below only holds what was known before this date                                                   |
+| `businesses`                  | business ID                                  | `data["businesses"]["FI-D0001"]`                                                                                              |
+| `holiday_history`             | (business ID, holiday)                       | `data["holiday_history"][("FI-D0001", "XMAS_EVE")]`, in the order entered                                                     |
+| `holiday_history_by_date`     | (business ID, date)                          | `data["holiday_history_by_date"][("FI-D0001", "2025-12-24")]`                                                                 |
+| `holiday_history_by_business` | business ID                                  | All of the business's entries                                                                                                 |
+| `regular_hours_history`       | business ID                                  | `data["regular_hours_history"]["SE-D0016"]`, oldest first                                                                     |
+| `peers`                       | (country, city size, business type, holiday) | `data["peers"][("FI", "capital", "cafe", "XMAS_EVE")]`                                                                        |
+| `last_owner_entry`            | business ID                                  | The day the owner last entered any special hours                                                                              |
+| `seasonal_types`              | -                                            | Business types whose businesses publish seasonal breaks, e.g. `{"seasonal_terrace", "ski_rental"}`                            |
+| `true_closures`               | (country, business type, holiday)            | `data["true_closures"][("FI", "hair_salon", "INTERDAY")]` gives `{business_id: [days, closed_days]}`                          |
+| `true_closures_by_month`      | (business type, month)                       | The same, by month instead of holiday                                                                                         |
+| `holiday_on`                  | (country, date)                              | `data["holiday_on"][("FI", "2025-12-26")]` gives `"BOXING_DAY"`                                                               |
+| `day_types`                   | holiday                                      | `data["day_types"]["XMAS_EVE"]` gives `"EVE"`                                                                                 |
+| `snow_depth`                  | (city, date)                                 | Measured before the snapshot, or forecast for the 10 days after it                                                            |
+| `snow_chance`                 | (city, month, day)                           | Long-term chance of at least 10 cm of snow                                                                                    |
+| `city_sizes`                  | city name                                    | `data["city_sizes"]["Helsinki"]` gives `"capital"`                                                                            |
+| `google_user_edits`           | business ID                                  | `data["google_user_edits"]["FI-00187"]`. Their status may have been decided after the snapshot                                |
+| `reviews`                     | business ID                                  | `data["reviews"]["FI-00001"]`. Each review has a `written_on` date                                                            |
+| `owner_answers`               | -                                            | `"answered"`: a set of (business ID, date, or "closed-for-good"); `"rejected"`: the hours rejected per (business ID, holiday) |
 
 The lists by business ID or (business ID, holiday) return an empty list for a business with no history. For the other lookups, use `.get()`.
 
@@ -169,11 +183,11 @@ Field meanings are in `data/fonecta-connect-suggests-2026/docs/DATA_DICTIONARY.m
 
 ## Other files
 
-| File | What it does |
-|---|---|
-| `hours.py` | Hours as text ("10:00-14:00", "closed"), normal weekly hours on a date, published breaks, and what Google shows: from `entities.json` for 2026, rebuilt from the history for the 2025 back-test (27 of 11,118 rows differ) |
-| `save.py` | Writes the predictions and their reasons to the web app's `prediction` table through Wrangler |
-| `ai.py` | Asks a language model on Featherless, or locally through Ollama, and caches every answer in `ai_cache.json`. Retries while Featherless is busy, and stops a run after 2 million tokens |
+| File                | What it does                                                                                                                                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hours.py`          | Hours as text ("10:00-14:00", "closed"), normal weekly hours on a date, published breaks, and what Google shows: from `entities.json` for 2026, rebuilt from the history for the 2025 back-test (27 of 11,118 rows differ)       |
+| `save.py`           | Writes the predictions and their reasons to the web app's `prediction` table through Wrangler                                                                                                                                    |
+| `ai.py`             | Asks a language model on Featherless, or locally through Ollama, and caches every answer in `ai_cache.json`. Retries while Featherless is busy, and stops a run after 2 million tokens                                           |
 | `review_reading.py` | Asks the model what a review says: closed, closed early, opened late, open, shut down for good, or nothing useful, and the times it mentions. Finnish reviews go to Qwen2.5-72B, Swedish and Norwegian ones to Mistral-Small 24B |
-| `read_reviews.py` | Reads the reviews the clues need in batches, and cleans the cache |
-| `holiday_names.py` | Holiday names as customers write them in fi/sv/nb/en, to tell which holiday a review is about |
+| `read_reviews.py`   | Reads the reviews the clues need in batches, and cleans the cache                                                                                                                                                                |
+| `holiday_names.py`  | Holiday names as customers write them in fi/sv/nb/en, to tell which holiday a review is about                                                                                                                                    |
