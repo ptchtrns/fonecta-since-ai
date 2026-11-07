@@ -10,6 +10,7 @@ type ReasonCopy = {
   mall: (name: string) => string;
   seasonal: string;
   ownSeasonal: string;
+  ownClosedDays: string;
   doorsClosed: string;
   closedAt: (time: string) => string;
   closedUntil: (time: string) => string;
@@ -78,6 +79,7 @@ const copy: Record<Language, Copy> = {
       mall: (name) => `${name} on julkaissut tämän päivän aukioloajat.`,
       seasonal: 'Kaltaisesi yritykset ovat kiinni tähän aikaan vuodesta.',
       ownSeasonal: 'Olet aiempina vuosina ollut kiinni tähän aikaan vuodesta.',
+      ownClosedDays: 'Olet ollut kiinni useimpina erikoispäivinä, joista olet kertonut meille.',
       doorsClosed: 'Asiakas löysi ovesi suljettuina tänä päivänä viime vuonna.',
       closedAt: (time) => `Asiakas löysi ovesi jo suljettuina klo ${time} tänä päivänä viime vuonna.`,
       closedUntil: (time) => `Asiakas löysi ovesi suljettuina klo ${time} asti tänä päivänä viime vuonna.`,
@@ -119,6 +121,7 @@ const copy: Record<Language, Copy> = {
       mall: (name) => `${name} har publicerat sina öppettider för den här dagen.`,
       seasonal: 'Företag som ditt har stängt den här tiden på året.',
       ownSeasonal: 'Du har haft stängt den här tiden på året tidigare år.',
+      ownClosedDays: 'Du har haft stängt de flesta specialdagar som du har berättat om för oss.',
       doorsClosed: 'En kund fann dörren stängd den här dagen i fjol.',
       closedAt: (time) => `En kund fann dörren redan stängd kl. ${time} den här dagen i fjol.`,
       closedUntil: (time) => `En kund fann dörren stängd fram till kl. ${time} den här dagen i fjol.`,
@@ -161,6 +164,7 @@ const copy: Record<Language, Copy> = {
       mall: (name) => `${name} har publisert åpningstidene for denne dagen.`,
       seasonal: 'Bedrifter som din holder stengt på denne tiden av året.',
       ownSeasonal: 'Du har holdt stengt på denne tiden av året tidligere år.',
+      ownClosedDays: 'Du har holdt stengt de fleste spesialdagene du har fortalt oss om.',
       doorsClosed: 'En kunde fant døren stengt denne dagen i fjor.',
       closedAt: (time) => `En kunde fant døren allerede stengt kl. ${time} denne dagen i fjor.`,
       closedUntil: (time) => `En kunde fant døren stengt frem til kl. ${time} denne dagen i fjor.`,
@@ -202,6 +206,7 @@ const copy: Record<Language, Copy> = {
       mall: (name) => `${name} has published its hours for this day.`,
       seasonal: 'Businesses like yours are closed at this time of year.',
       ownSeasonal: 'You have been closed at this time of year in earlier years.',
+      ownClosedDays: 'You were closed on most of the special days you have told us about.',
       doorsClosed: 'A customer found your doors closed on this day last year.',
       closedAt: (time) => `A customer found you already closed at ${time} on this day last year.`,
       closedUntil: (time) => `A customer found you still closed until ${time} on this day last year.`,
@@ -230,6 +235,7 @@ export function translateReason(reason: string, language: Language): string | nu
   if ((m = match(/^A customer found you still closed until (\S+)/))) return r.closedUntil(m[1]!);
   if ((m = match(/^A Google user reported these hours for (\S+?),/))) return r.googleUser(m[1]!);
   if ((m = match(/^(.+) has published its hours/))) return r.mall(m[1]!);
+  if (reason.startsWith('You were closed on most of the special days')) return r.ownClosedDays;
   if (reason.startsWith('You ')) return r.ownSeasonal;
   return null;
 }
