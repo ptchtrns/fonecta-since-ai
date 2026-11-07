@@ -18,6 +18,8 @@ const reasons = [
   'A Google user reported these hours for 2025-12-24, the last time this day came round',
   'There is unlikely to be enough snow for skiing on this day',
   'You were closed on most of the special days you have told us about',
+  "A customer reported that you're now open 10:00-18:00 on this weekday",
+  "A customer reported that you're now closed on this weekday",
 ];
 
 describe('translateReason', () => {
@@ -30,6 +32,7 @@ describe('translateReason', () => {
     expect(translateReason(reasons[1]!, 'fi')).toContain('39%');
     expect(translateReason(reasons[3]!, 'sv')).toContain('Kauppakeskus Revontuli');
     expect(translateReason(reasons[8]!, 'nb')).toContain('16:00');
+    expect(translateReason(reasons[14]!, 'fi')).toContain('10:00-18:00');
   });
   test('closed on most special days is not mistaken for a seasonal break', () => {
     expect(translateReason(reasons[13]!, 'en')).toBe(

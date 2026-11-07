@@ -7,4 +7,5 @@ from clues.peers import guess_from_peers, peers_evidence
 from clues.reviews import guess_from_reviews
 from clues.seasonal_break import guess_from_seasonal_break
 from clues.snow import guess_from_snow
+from clues.stated_hours import guess_from_stated_hours
 from clues.type_habits import guess_from_type_habits, type_habits_evidence

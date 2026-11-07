@@ -1,4 +1,4 @@
-# TODO team name – Connect Suggests
+# Token Burners – Connect Suggests
 
 Our entry for the Fonecta challenge at Since AI Hackathon 2026. For setting up and developing the web app and worker, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
@@ -67,30 +67,91 @@ The clues report this evidence even when it's too weak for a guess of their own,
 
 ## Final customer messages (as text)
 
-From `apps/web/src/lib/messages.ts`, with buttons Approve / Edit / No thanks (in the owner's language):
+These are generated with the app's own message code (`apps/web/src/lib/messages.ts`), for real demo businesses and their first suggestion of the 2026 season. On WhatsApp the text between stars shows in bold and the answers in brackets are buttons. The link opens a page where the owner answers without logging in.
 
-> Hei Aleksi! Joulupäivä on pe 25.12. Google näyttää nyt 07:30–18:00.
-> Perustuu aiempina vuosina tälle päivälle antamiisi aikoihin.
-> 39% samanlaisista lähialueen yrityksistä kertoo olevansa kiinni tänä päivänä.
+**Finnish**, Kahvila Kipinä (FI-D0017), Christmas Day:
+
+> Hei Aino! *Vahvista aukioloaikasi: Joulupäivä pe 25.12.*
+> Ehdotamme: *suljettu*. Google näyttää nyt 08:00–17:00.
+> Noin 65 ihmisen odotetaan etsivän sinua sinä päivänä. Oikeat ajat säästävät heidät turhalta matkalta.
 >
-> Ehdotamme: *pe 25.12. suljettu*
+> 38% samanlaisista lähialueen yrityksistä kertoo olevansa kiinni tänä päivänä.
 >
 > Muokkaa tai katso perustelut: https://…/s/…
+> [Vahvista suljettu] [Auki – muokkaa ajat] [Ohita]
 
-> Hi Aleksi! Christmas Day is on Fri 25.12. Google now shows 07:30–18:00.
-> Based on what you entered for this day in previous years.
+After approving:
+
+> Valmista! pe 25.12. suljettu on päivitetty.
+> Näkyy nyt: Google (Search & Maps), Facebook, Finder.fi / Fonecta.fi, Fonecta Caller.
+> Bing, Apple Maps, Waze (via Google), Tripadvisor, AI assistants (via Bing/Apple data): 7 d kuluessa.
+
+**Swedish**, Kafé Linnea (SE-D0008), Christmas Eve:
+
+> Hej Maria! *Bekräfta era öppettider: Julafton tors 24.12.*
+> Vi föreslår: *stängt*. Google visar nu 08:00–18:00.
+> Omkring 199 personer väntas söka efter er den dagen. Rätt tider sparar dem en onödig resa.
 >
-> We suggest: *Fri 25.12. closed*
+> Baserat på vad du angav för den här dagen tidigare år.
+>
+> Ändra eller se varför: https://…/s/…
+> [Bekräfta stängt] [Öppet – ändra tider] [Hoppa över]
+
+After declining:
+
+> Okej, vi låter tiderna vara och frågar inte om den här dagen igen.
+
+**Norwegian**, Bakeri Fjord (NO-D0009), Christmas Day:
+
+> Hei Marte! *Bekreft åpningstidene deres: Første juledag fre 25.12.*
+> Vi foreslår: *stengt*. Google viser nå 07:00–18:00.
+> Rundt 18 personer ventes å søke etter dere den dagen. Riktige tider sparer dem en unødvendig tur.
+>
+> Basert på det du oppga for denne dagen tidligere år.
+>
+> Endre eller se hvorfor: https://…/s/…
+> [Bekreft stengt] [Åpent – endre tider] [Hopp over]
+
+After tapping the edit button:
+
+> Endre eller se hvorfor: https://…/s/…
+
+After saving 10:00–14:00 on that page:
+
+> Ferdig! fre 25.12. 10:00–14:00 er oppdatert.
+> Vises nå på Google (Search & Maps), Facebook.
+> 1881.no, Bing, Gule Sider, Apple Maps, Waze (via Google), Tripadvisor, AI assistants (via Bing/Apple data), Foursquare: innen 7 d.
+
+**English**, for an owner who chose English, the same suggestion as for Kahvila Kipinä:
+
+> Hi Aino! *Confirm your Christmas Day hours (Fri 25.12.)*
+> We suggest: *closed*. Google now shows 08:00–17:00.
+> About 65 people are expected to look you up that day. Keep your hours right so nobody makes a wasted trip.
+>
+> 38% of similar businesses nearby have told us they close on this day.
 >
 > Edit or see why: https://…/s/…
+> [Confirm closed] [We're open – edit] [Dismiss]
 
-Confirmation after approving:
+After approving:
 
 > Done! Fri 25.12. closed is updated.
-> Live now on Google (Search & Maps), Finder.fi / Fonecta.fi.
-> Apple Maps, Bing: within 2 d.
+> Live now on Google (Search & Maps), Facebook, Finder.fi / Fonecta.fi, Fonecta Caller.
+> Bing, Apple Maps, Waze (via Google), Tripadvisor, AI assistants (via Bing/Apple data): within 7 d.
 
-After standing permission:
+After declining:
+
+> Got it, we'll leave your hours as they are and won't ask about this day again.
+
+After tapping the edit button, then saving 10:00–14:00:
+
+> Edit or see why: https://…/s/…
+
+> Done! Fri 25.12. 10:00–14:00 is updated.
+> Live now on Google (Search & Maps), Facebook, Finder.fi / Fonecta.fi, Fonecta Caller.
+> Bing, Apple Maps, Waze (via Google), Tripadvisor, AI assistants (via Bing/Apple data): within 7 d.
+
+After standing permission ("Handle public holidays without asking"):
 
 > As agreed, we've updated the hours for Tilitoimisto Otso: Fri 25.12. closed, Fri 1.1. closed.
 
@@ -114,7 +175,11 @@ What we learned:
 | scikit-learn, NumPy | BSD 3-Clause |
 | Qwen2.5-72B-Instruct, used through Featherless to read reviews of Finnish businesses | Qwen licence (commercial use allowed below 100 million monthly users) |
 | Mistral-Small-24B-Instruct-2501, used through Featherless to read reviews of Swedish and Norwegian businesses | Apache 2.0 |
-| TODO: web app and worker dependencies | |
+| Web app: [SolidJS](https://www.solidjs.com) (`solid-js`, `@solidjs/router`, `@solidjs/meta`, `@solidjs/web`, `@solidjs/vite-plugin`), [Better Auth](https://www.better-auth.com), [Zod](https://zod.dev), [Tailwind CSS](https://tailwindcss.com), [daisyUI](https://daisyui.com), [Vite](https://vite.dev), [Vite+](https://viteplus.dev), `filesystem-routing`, `@cloudflare/vite-plugin` | MIT |
+| [Drizzle ORM](https://orm.drizzle.team) (`drizzle-orm`), TypeScript | Apache 2.0 (Drizzle Kit: MIT) |
+| Wrangler | MIT or Apache 2.0 |
+| Worker: [HTTPX](https://www.python-httpx.org), [python-dotenv](https://github.com/theskumar/python-dotenv) | BSD 3-Clause |
+| Data import script: [PyArrow](https://arrow.apache.org) | Apache 2.0 |
 | Publisher logos from [Simple Icons](https://simpleicons.org) | CC0 |
 | Icons from [Lucide](https://lucide.dev) | ISC |
 
