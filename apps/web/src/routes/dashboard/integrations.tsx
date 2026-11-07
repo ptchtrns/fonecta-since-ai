@@ -128,8 +128,9 @@ export default function Integrations() {
 
           <Show when={!whatsapp().configured}>
             <p class="rounded-box border border-base-300 bg-base-200 px-4 py-3 text-sm">
-              Sending isn't connected on this server yet. Your settings are saved, and messages start once it
-              is.
+              WhatsApp sending is off because the <code class="font-mono">WHATSAPP_TOKEN</code> and{' '}
+              <code class="font-mono">WHATSAPP_PHONE_NUMBER_ID</code> environment variables aren't set. Your
+              settings still save, and messages start once both are set.
             </p>
           </Show>
           <FormMessage message={form.message()} />
