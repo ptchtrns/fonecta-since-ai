@@ -26,6 +26,9 @@ export const user = sqliteTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
   image: text('image'),
+  // The business this account manages. Not a foreign key: reseeding the dataset empties `entity` and refills it
+  // with the same ids, and that shouldn't sign anyone out of their business.
+  entityId: text('entity_id'),
   ...timestamps,
 });
 
@@ -126,7 +129,10 @@ export const job = sqliteTable(
 // epoch ms in the source, use timestamp_ms.
 
 const countries = ['FI', 'SE', 'NO'] as const;
-const languages = ['fi', 'sv', 'nb', 'en'] as const;
+export const languages = ['fi', 'sv', 'nb', 'en'] as const;
+export type Language = (typeof languages)[number];
+/** How pressing a suggestion is. See `importanceLabel`. */
+export const importances = ['low', 'medium', 'high'] as const;
 const contactChannels = ['EMAIL', 'SMS', 'WHATSAPP', 'APP_PUSH'] as const;
 const entitySplits = ['dev', 'test', 'demo', 'reference'] as const;
 const cityTiers = ['capital', 'large_city', 'town', 'ski_resort'] as const;
@@ -545,6 +551,89 @@ export const prediction = sqliteTable(
     reasons: text('reasons', { mode: 'json' }).$type<string[]>().notNull(),
   },
   (t) => [primaryKey({ columns: [t.entityId, t.date] })],
+);
+
+// What owners did. These are app tables, so a reseed or a new predictor run leaves them alone, and the dataset's
+// `entity` table stays as it came, which keeps the predictor's scoring runs unaffected by demo clicks.
+
+export type BusinessEdits = Partial<{
+  name: string;
+  phone: string;
+  website: string;
+  addressLine1: string;
+  postalCode: string;
+  description: string;
+  hours: WeekHours;
+}>;
+
+export const businessProfile = sqliteTable('business_profile', {
+  entityId: text('entity_id').primaryKey(),
+  // The owner's changes on top of the entity's own values.
+  edits: text('edits', { mode: 'json' }).$type<BusinessEdits>().notNull(),
+  whatsappPhone: text('whatsapp_phone'),
+  whatsappLanguage: text('whatsapp_language', { enum: languages }).notNull().default('en'),
+  whatsappOn: integer('whatsapp_on', { mode: 'boolean' }).notNull().default(false),
+  // The least important suggestion that goes out on WhatsApp. Lower ones wait on the dashboard.
+  whatsappMinImportance: text('whatsapp_min_importance', { enum: importances }).notNull().default('low'),
+  // "Handle public holidays from now on without asking."
+  standingPermission: integer('standing_permission', { mode: 'boolean' }).notNull().default(false),
+  // WhatsApp only allows free-form messages within 24 hours of the owner's last message.
+  lastInboundAt: integer('last_inbound_at', { mode: 'timestamp_ms' }),
+  ...timestamps,
+});
+
+export const suggestionStatuses = ['pending', 'approved', 'edited', 'declined'] as const;
+export type SuggestionStatus = (typeof suggestionStatuses)[number];
+export const decisionChannels = ['dashboard', 'link', 'whatsapp', 'standing'] as const;
+export type DecisionChannel = (typeof decisionChannels)[number];
+
+/** What was suggested and why, kept with the decision: predictor runs replace the `prediction` rows. */
+export type SuggestionSnapshot = {
+  label: string;
+  shown: string;
+  suggested: string | null;
+  confidence: number | null;
+  reasons: string[];
+};
+
+// One row per suggestion that was sent or answered. `suggestionKey` is the prediction's date, or
+// 'closed-for-good' for the single question about a business that may have shut down.
+export const suggestionState = sqliteTable(
+  'suggestion_state',
+  {
+    entityId: text('entity_id').notNull(),
+    suggestionKey: text('suggestion_key').notNull(),
+    // Secret in the owner's no-login link. It only grants answering this one suggestion.
+    token: text('token').notNull().unique(),
+    status: text('status', { enum: suggestionStatuses }).notNull().default('pending'),
+    hours: text('hours'),
+    via: text('via', { enum: decisionChannels }),
+    snapshot: text('snapshot', { mode: 'json' }).$type<SuggestionSnapshot>().notNull(),
+    sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
+    decidedAt: integer('decided_at', { mode: 'timestamp_ms' }),
+    publishedAt: integer('published_at', { mode: 'timestamp_ms' }),
+    ...timestamps,
+  },
+  (t) => [primaryKey({ columns: [t.entityId, t.suggestionKey] })],
+);
+
+export const sourceKinds = ['website', 'facebook', 'instagram', 'other'] as const;
+export type SourceKind = (typeof sourceKinds)[number];
+
+// Pages the owner linked. Each suggestion is compared with the hours found on them.
+export const businessSource = sqliteTable(
+  'business_source',
+  {
+    entityId: text('entity_id').notNull(),
+    kind: text('kind', { enum: sourceKinds }).notNull(),
+    url: text('url').notNull(),
+    status: text('status', { enum: ['read', 'unreachable'] }).notNull(),
+    // Date to hours as text ("closed", "10:00-15:00"), for the dates this page mentions.
+    findings: text('findings', { mode: 'json' }).$type<Record<string, string>>().notNull(),
+    checkedAt: integer('checked_at', { mode: 'timestamp_ms' }).notNull(),
+    ...timestamps,
+  },
+  (t) => [primaryKey({ columns: [t.entityId, t.kind] })],
 );
 
 export type User = typeof user.$inferSelect;

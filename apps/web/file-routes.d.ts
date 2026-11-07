@@ -49,6 +49,13 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/api/businesses";
+      page: false;
+      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/businesses"), Extract<"GET", keyof typeof import("./src/routes/api/businesses")>>>;
+      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/businesses"), Extract<"GET", keyof typeof import("./src/routes/api/businesses")>>>;
+      $$route?: undefined;
+    },
+    {
       path: "/api/files/*key";
       page: false;
       $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/files/[...key]"), Extract<"GET", keyof typeof import("./src/routes/api/files/[...key]")>>>;
@@ -83,10 +90,11 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
-      path: "/api/predictions";
+      path: "/api/s/:token";
       page: false;
-      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/predictions"), Extract<"GET", keyof typeof import("./src/routes/api/predictions")>>>;
-      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/predictions"), Extract<"GET", keyof typeof import("./src/routes/api/predictions")>>>;
+      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/s/[token]"), Extract<"GET", keyof typeof import("./src/routes/api/s/[token]")>>>;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/s/[token]"), Extract<"POST", keyof typeof import("./src/routes/api/s/[token]")>>>;
+      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/s/[token]"), Extract<"GET", keyof typeof import("./src/routes/api/s/[token]")>>>;
       $$route?: undefined;
     },
     {
@@ -99,6 +107,12 @@ declare module "virtual:file-routes" {
       path: "/api/settings/profile";
       page: false;
       $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/settings/profile"), Extract<"PATCH", keyof typeof import("./src/routes/api/settings/profile")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/suggestions/:id";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/suggestions/[id]"), Extract<"POST", keyof typeof import("./src/routes/api/suggestions/[id]")>>>;
       $$route?: undefined;
     },
     {
@@ -116,22 +130,61 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/api/whatsapp/webhook";
+      page: false;
+      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/whatsapp/webhook"), Extract<"GET", keyof typeof import("./src/routes/api/whatsapp/webhook")>>>;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/whatsapp/webhook"), Extract<"POST", keyof typeof import("./src/routes/api/whatsapp/webhook")>>>;
+      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/whatsapp/webhook"), Extract<"GET", keyof typeof import("./src/routes/api/whatsapp/webhook")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace";
+      page: false;
+      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace"), Extract<"GET", keyof typeof import("./src/routes/api/workspace")>>>;
+      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace"), Extract<"GET", keyof typeof import("./src/routes/api/workspace")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/business";
+      page: false;
+      $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/business"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/business")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/link";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/link"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/link")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/sources";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/sources"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/sources")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/sources/:kind";
+      page: false;
+      $DELETE: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/sources/[kind]"), Extract<"DELETE", keyof typeof import("./src/routes/api/workspace/sources/[kind]")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/whatsapp";
+      page: false;
+      $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/whatsapp"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/whatsapp")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/whatsapp/test";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/whatsapp/test"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/whatsapp/test")>>>;
+      $$route?: undefined;
+    },
+    {
       path: "/dashboard";
       page: true;
       $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard"), Extract<"default", keyof typeof import("./src/routes/dashboard")>>>;
       $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard"), Extract<"route", keyof typeof import("./src/routes/dashboard")>>>;
-    },
-    {
-      path: "/dashboard/ai";
-      page: true;
-      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/ai"), Extract<"default", keyof typeof import("./src/routes/dashboard/ai")>>>;
-      $$route?: undefined;
-    },
-    {
-      path: "/dashboard/analytics";
-      page: true;
-      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/analytics"), Extract<"default", keyof typeof import("./src/routes/dashboard/analytics")>>>;
-      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/analytics"), Extract<"route", keyof typeof import("./src/routes/dashboard/analytics")>>>;
     },
     {
       path: "/dashboard/";
@@ -140,16 +193,22 @@ declare module "virtual:file-routes" {
       $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/index"), Extract<"route", keyof typeof import("./src/routes/dashboard/index")>>>;
     },
     {
+      path: "/dashboard/integrations";
+      page: true;
+      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"default", keyof typeof import("./src/routes/dashboard/integrations")>>>;
+      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"route", keyof typeof import("./src/routes/dashboard/integrations")>>>;
+    },
+    {
       path: "/dashboard/settings";
       page: true;
       $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/settings"), Extract<"default", keyof typeof import("./src/routes/dashboard/settings")>>>;
       $$route?: undefined;
     },
     {
-      path: "/dashboard/suggestions";
+      path: "/dashboard/sources";
       page: true;
-      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/suggestions"), Extract<"default", keyof typeof import("./src/routes/dashboard/suggestions")>>>;
-      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/suggestions"), Extract<"route", keyof typeof import("./src/routes/dashboard/suggestions")>>>;
+      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/sources"), Extract<"default", keyof typeof import("./src/routes/dashboard/sources")>>>;
+      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/sources"), Extract<"route", keyof typeof import("./src/routes/dashboard/sources")>>>;
     },
     {
       path: "/";
@@ -162,6 +221,12 @@ declare module "virtual:file-routes" {
       page: true;
       $component: FileRouteLazyRef<Pick<typeof import("./src/routes/login"), Extract<"default", keyof typeof import("./src/routes/login")>>>;
       $$route?: undefined;
+    },
+    {
+      path: "/s/:token";
+      page: true;
+      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/s/[token]"), Extract<"default", keyof typeof import("./src/routes/s/[token]")>>>;
+      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/s/[token]"), Extract<"route", keyof typeof import("./src/routes/s/[token]")>>>;
     }
   ];
   export default routes;
@@ -193,6 +258,14 @@ declare module "virtual:file-routes" {
       children?: undefined;
     },
     {
+      path: "/s/:token";
+      id: "/s/:token";
+      page: true;
+      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/s/[token]"), Extract<"default", keyof typeof import("./src/routes/s/[token]")>>>;
+      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/s/[token]"), Extract<"route", keyof typeof import("./src/routes/s/[token]")>>>;
+      children?: undefined;
+    },
+    {
       path: "/dashboard";
       id: "/dashboard";
       page: true;
@@ -208,11 +281,11 @@ declare module "virtual:file-routes" {
           children?: undefined;
         },
         {
-          path: "/ai";
-          id: "/ai";
+          path: "/sources";
+          id: "/sources";
           page: true;
-          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/ai"), Extract<"default", keyof typeof import("./src/routes/dashboard/ai")>>>;
-          $$route?: undefined;
+          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/sources"), Extract<"default", keyof typeof import("./src/routes/dashboard/sources")>>>;
+          $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/sources"), Extract<"route", keyof typeof import("./src/routes/dashboard/sources")>>>;
           children?: undefined;
         },
         {
@@ -224,19 +297,11 @@ declare module "virtual:file-routes" {
           children?: undefined;
         },
         {
-          path: "/analytics";
-          id: "/analytics";
+          path: "/integrations";
+          id: "/integrations";
           page: true;
-          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/analytics"), Extract<"default", keyof typeof import("./src/routes/dashboard/analytics")>>>;
-          $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/analytics"), Extract<"route", keyof typeof import("./src/routes/dashboard/analytics")>>>;
-          children?: undefined;
-        },
-        {
-          path: "/suggestions";
-          id: "/suggestions";
-          page: true;
-          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/suggestions"), Extract<"default", keyof typeof import("./src/routes/dashboard/suggestions")>>>;
-          $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/suggestions"), Extract<"route", keyof typeof import("./src/routes/dashboard/suggestions")>>>;
+          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"default", keyof typeof import("./src/routes/dashboard/integrations")>>>;
+          $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"route", keyof typeof import("./src/routes/dashboard/integrations")>>>;
           children?: undefined;
         }
       ];

@@ -14,6 +14,7 @@ export const signInSchema = z.object({
 export type SignInPayload = z.infer<typeof signInSchema>;
 
 export const signUpSchema = z.object({
+  entityId: z.string().min(1, { message: 'Choose your business from the list' }).max(64),
   name: z.string().trim().min(1, { message: 'Enter your name' }).max(100),
   email,
   password,

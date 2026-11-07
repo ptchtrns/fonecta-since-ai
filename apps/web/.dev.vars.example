@@ -3,3 +3,17 @@ BETTER_AUTH_SECRET=change-me-to-a-32-character-random-string
 WORKER_TOKEN=local-worker-token
 # Optional. Better Auth infers the base URL from the request when unset.
 # BETTER_AUTH_URL=http://localhost:3000
+# Public address for links in owner messages (a tunnel locally). Nightly messages need it.
+# APP_URL=https://your-tunnel.ngrok-free.app
+# Yext: the dataset's mock (python3 data/fonecta-connect-suggests-2026/mock_api/server.py, key "demo") or the sandbox
+# (https://sbx-api.yextapis.com). Without it approved changes are saved here but not published. Never commit a real key.
+# YEXT_API_URL=http://localhost:8787
+# YEXT_API_KEY=demo
+# WhatsApp Cloud API. The phone number id is on the Meta app's WhatsApp > API Setup page.
+# WHATSAPP_TOKEN=
+# WHATSAPP_PHONE_NUMBER_ID=
+# Optional: an approved template (one body variable, three quick replies) to start conversations.
+# WHATSAPP_TEMPLATE=
+# Webhook for button replies at /api/whatsapp/webhook. Needs a public URL.
+# WHATSAPP_VERIFY_TOKEN=
+# WHATSAPP_APP_SECRET=

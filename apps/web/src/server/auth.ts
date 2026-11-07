@@ -1,10 +1,14 @@
 import 'server-only';
 import { betterAuth } from 'better-auth';
+import { APIError } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { env } from 'cloudflare:workers';
 import { account, session, user, verification } from '~/db/schema';
 import { db } from '~/server/db';
+import { log } from '~/server/log';
 import { hashPassword, verifyPassword } from '~/server/password';
+import { isSelectableBusiness } from '~/services/business.service';
+import { onBusinessLinked } from '~/services/contact.service';
 
 export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
@@ -22,6 +26,28 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 100,
     password: { hash: hashPassword, verify: verifyPassword },
+  },
+  user: {
+    // Chosen with the combobox on the sign-up form.
+    additionalFields: { entityId: { type: 'string', required: false, input: true } },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          const { entityId } = user as { entityId?: string | null };
+          if (!entityId || !(await isSelectableBusiness(entityId))) {
+            throw new APIError('BAD_REQUEST', { message: 'Choose your business from the list' });
+          }
+        },
+        after: async (user) => {
+          const { entityId } = user as { entityId?: string | null };
+          // The account exists by now, so a problem here must not fail the sign-up.
+          if (entityId)
+            await onBusinessLinked(entityId).catch((error) => log.error('auth', 'link failed', { error }));
+        },
+      },
+    },
   },
   // Sessions are read from D1 on every request. Better Auth's cookieCache would save that read,
   // but profile edits and revoked sessions would then lag behind by the cache lifetime.

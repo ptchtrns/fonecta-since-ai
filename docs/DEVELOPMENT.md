@@ -127,7 +127,27 @@ The only answers loaded are in `dev_truth_history`, which the predictor uses as 
 
 ## Predictions on the dashboard
 
-`python3 apps/predictor/run.py --save local` replaces the `prediction` table through Wrangler, and `/dashboard/suggestions` shows the rows for the demo businesses. For the deployed site, use `--save remote` after a full local load: the predictor always computes locally and sends only the demo businesses' rows, because the deployed database doesn't have the others.
+`python3 apps/predictor/run.py --save local` replaces the `prediction` table through Wrangler, and the Home page shows the rows for the signed-in account's business. For the deployed site, use `--save remote` after a full local load: the predictor always computes locally and sends only the demo businesses' rows, because the deployed database doesn't have the others.
+
+## The owner's side
+
+An account belongs to one business, chosen with the combobox when signing up (`user.entity_id`). The dashboard has three pages: Home (business card and suggestions), Sources and Integrations. Account settings are in the menu at the bottom of the sidebar.
+
+Dataset tables stay as they were loaded, so clicks in the demo can't change what the predictor scores. What owners do is kept in app tables that survive a reseed or a predictor run:
+
+| Table | What it holds |
+| ------------------ | -------------------------------------------------------------------------- |
+| `business_profile` | The owner's edits on top of `entity`, WhatsApp settings, standing permission |
+| `suggestion_state` | One row per suggestion sent or answered: token for the link, decision, what was suggested |
+| `business_source` | Pages the owner linked and the hours found on them |
+
+Optional settings, all in `.dev.vars.example`:
+
+- `YEXT_API_URL`, `YEXT_API_KEY`: where approved changes are written. Without them decisions are saved and the UI says they aren't live. The dataset's mock (`python3 data/fonecta-connect-suggests-2026/mock_api/server.py`) only accepts `hours`, `name` and `closed`, so saving other business details against it shows its error. The real API takes them.
+- `WHATSAPP_*`: the Cloud API. Button taps arrive at `/api/whatsapp/webhook`. Without these, Integrations still shows the next message and a link to its answer page.
+- `APP_URL`: the public address in owner links, and required for the nightly cron, which reads linked pages again, applies standing permissions and sends each owner their next question.
+
+Linked pages are read with a plain pattern match (`src/lib/source-reader.ts`), so only a date or holiday name followed by hours or "closed" counts. Sites that block automatic reading, such as Facebook and Instagram often do, show as "Could not read".
 
 ## Deploying
 
@@ -153,6 +173,7 @@ Manual deploy: `pnpm db:migrate:remote` (from `apps/web`) and `pnpm deploy`.
 | `pnpm dev`             | Dev server for apps/web                      |
 | `pnpm build`           | Production build                             |
 | `pnpm check`           | Format check, lint and type-aware checks     |
+| `pnpm --filter web test --run` | Unit tests for the pure helpers in `src/lib` |
 | `pnpm db:generate`     | Generate a migration from `src/db/schema.ts` |
 | `pnpm db:migrate`      | Apply migrations locally                     |
 | `pnpm db:seed`         | Load the whole Connect dataset into local D1 |

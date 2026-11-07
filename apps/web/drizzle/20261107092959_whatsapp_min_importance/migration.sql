@@ -1,0 +1,1 @@
+ALTER TABLE `business_profile` ADD `whatsapp_min_importance` text DEFAULT 'low' NOT NULL;

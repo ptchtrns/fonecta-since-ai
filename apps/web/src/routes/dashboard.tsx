@@ -1,28 +1,38 @@
 import type { RouteDefinition } from '@solidjs/router';
-import { createMemo, For, type ParentProps } from 'solid-js';
-import { Logo } from '~/components/Logo';
+import { createMemo, For, Show, type ParentProps } from 'solid-js';
+import type { JSX } from '@solidjs/web';
+import { ChooseBusiness } from '~/components/connect/ChooseBusiness';
+import { ConnectLogo } from '~/components/connect/ConnectLogo';
 import { authClient } from '~/lib/auth-client';
 import { requireUser } from '~/queries/session';
+import { getWorkspace } from '~/queries/workspace';
 
 export const route = {
-  preload: () => void requireUser(),
+  preload: () => {
+    void requireUser();
+    void getWorkspace();
+  },
 } satisfies RouteDefinition;
 
 const DRAWER_ID = 'dashboard-drawer';
 const COLLAPSED_KEY = 'sidebar-collapsed';
 
-const links: { href: string; label: string; icon: typeof HomeIcon }[] = [
-  { href: '/dashboard', label: 'Overview', icon: HomeIcon },
-  { href: '/dashboard/suggestions', label: 'Suggestions', icon: ClockIcon },
-  { href: '/dashboard/analytics', label: 'Analytics', icon: ChartIcon },
-  { href: '/dashboard/ai', label: 'AI', icon: SparklesIcon },
-  { href: '/dashboard/settings', label: 'Settings', icon: CogIcon },
+type Link = { href: string; label: string; icon: () => JSX.Element };
+const links: Link[] = [
+  { href: '/dashboard', label: 'Home', icon: HomeIcon },
+  { href: '/dashboard/sources', label: 'Sources', icon: ShieldIcon },
+  { href: '/dashboard/integrations', label: 'Integrations', icon: PlugIcon },
 ];
 
 // Layout for every page under /dashboard. Guests are redirected by middleware and by requireUser.
 // The drawer checkbox means "overlay open" on small screens and "expanded" on large ones.
 export default function DashboardLayout(props: ParentProps) {
   const user = createMemo(() => requireUser());
+  const workspace = createMemo(() => getWorkspace());
+  // The number of waiting suggestions, next to Home.
+  const counts = (): Record<string, number> => ({
+    '/dashboard': workspace()?.suggestions.pending.length ?? 0,
+  });
   let toggle!: HTMLInputElement;
 
   const isLarge = () => window.matchMedia('(min-width: 64rem)').matches;
@@ -57,37 +67,36 @@ export default function DashboardLayout(props: ParentProps) {
 
   return (
     <div class="drawer lg:drawer-open">
-      <input
-        id={DRAWER_ID}
-        ref={initToggle}
-        type="checkbox"
-        class="drawer-toggle"
-        onChange={rememberState}
-      />
+      <input id={DRAWER_ID} ref={initToggle} type="checkbox" class="drawer-toggle" onChange={rememberState} />
       <div class="drawer-content flex min-h-screen flex-col">
         <header class="navbar sticky top-0 z-10 border-b border-base-300 bg-base-100/80 px-4 backdrop-blur lg:hidden">
           <label for={DRAWER_ID} class="btn btn-square btn-ghost" aria-label="Open menu">
             <MenuIcon />
           </label>
-          <a href="/" class="ml-2 flex items-center gap-2 font-semibold">
-            <Logo />
-            Hackathon
+          <a href="/dashboard" class="ml-2">
+            <ConnectLogo />
           </a>
         </header>
-        <main class="flex-1 p-4 lg:p-8">{props.children}</main>
+        <main class="flex-1 p-4 lg:p-8">
+          <Show
+            when={workspace()}
+            fallback={
+              <div class="mx-auto max-w-lg">
+                <ChooseBusiness title="Which business is yours?" />
+              </div>
+            }
+          >
+            {props.children}
+          </Show>
+        </main>
       </div>
 
       <div class="drawer-side z-20 is-drawer-close:overflow-visible">
         <label for={DRAWER_ID} aria-label="Close menu" class="drawer-overlay" />
         <aside class="flex min-h-full w-64 flex-col border-r border-base-300 bg-base-100 transition-[width] duration-200 is-drawer-close:w-16">
           <div class="flex h-16 items-center justify-between gap-2 px-4 is-drawer-close:justify-center is-drawer-close:px-2">
-            <a
-              href="/"
-              class="flex items-center gap-3 font-semibold is-drawer-close:hidden"
-              onClick={closeOnMobile}
-            >
-              <Logo />
-              <span class="text-lg">Hackathon</span>
+            <a href="/dashboard" class="is-drawer-close:hidden" onClick={closeOnMobile}>
+              <ConnectLogo />
             </a>
             <div class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Expand">
               <label
@@ -103,21 +112,8 @@ export default function DashboardLayout(props: ParentProps) {
           </div>
 
           <ul class="menu w-full grow gap-1 px-2">
-            <li class="menu-title is-drawer-close:hidden">Workspace</li>
             <For each={links}>
-              {(link) => (
-                <li>
-                  <a
-                    href={link.href}
-                    class="gap-3 py-2.5 is-drawer-close:tooltip is-drawer-close:tooltip-right aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary"
-                    data-tip={link.label}
-                    onClick={closeOnMobile}
-                  >
-                    <link.icon />
-                    <span class="is-drawer-close:hidden">{link.label}</span>
-                  </a>
-                </li>
-              )}
+              {(link) => <NavItem link={link} count={counts()[link.href]} onPick={closeOnMobile} />}
             </For>
           </ul>
 
@@ -129,7 +125,7 @@ export default function DashboardLayout(props: ParentProps) {
                 class="btn btn-ghost h-auto w-full justify-start gap-3 px-2 py-2 font-normal is-drawer-close:justify-center"
               >
                 <div class="avatar avatar-placeholder">
-                  <div class="w-8 rounded-full bg-primary text-primary-content">
+                  <div class="w-8 rounded-full bg-base-300 text-base-content">
                     <span>{user().name.charAt(0).toUpperCase()}</span>
                   </div>
                 </div>
@@ -141,7 +137,7 @@ export default function DashboardLayout(props: ParentProps) {
               </div>
               <ul
                 tabindex="0"
-                class="menu dropdown-content z-30 mb-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"
+                class="menu dropdown-content z-30 [&_a:active]:bg-base-200 [&_a:active]:text-base-content mb-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"
               >
                 <li>
                   <a href="/dashboard/settings" onClick={closeOnMobile}>
@@ -161,6 +157,27 @@ export default function DashboardLayout(props: ParentProps) {
         </aside>
       </div>
     </div>
+  );
+}
+
+function NavItem(props: { link: Link; count?: number; onPick: () => void }) {
+  return (
+    <li>
+      <a
+        href={props.link.href}
+        class="gap-3 py-2.5 text-base-content/70 is-drawer-close:tooltip is-drawer-close:tooltip-right active:bg-base-200 active:text-base-content aria-[current=page]:bg-base-200 aria-[current=page]:font-medium aria-[current=page]:text-base-content"
+        data-tip={props.link.label}
+        onClick={props.onPick}
+      >
+        {props.link.icon()}
+        <span class="is-drawer-close:hidden">{props.link.label}</span>
+        <Show when={props.count}>
+          {(n) => (
+            <span class="badge ml-auto badge-sm badge-ghost tabular-nums is-drawer-close:hidden">{n()}</span>
+          )}
+        </Show>
+      </a>
+    </li>
   );
 }
 
@@ -196,26 +213,19 @@ function HomeIcon() {
   );
 }
 
-function ClockIcon() {
+function ShieldIcon() {
   return (
     <Icon>
-      <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2" />
+      <path d="M12 22s8-3 8-10V5l-8-3-8 3v7c0 7 8 10 8 10Z" />
+      <path d="m9 12 2 2 4-4" />
     </Icon>
   );
 }
 
-function ChartIcon() {
+function PlugIcon() {
   return (
     <Icon>
-      <path d="M3 3v18h18M8 17v-5M13 17V8M18 17v-8" />
-    </Icon>
-  );
-}
-
-function SparklesIcon() {
-  return (
-    <Icon>
-      <path d="M10 3 8.5 7.5 4 9l4.5 1.5L10 15l1.5-4.5L16 9l-4.5-1.5L10 3ZM18 14l-.75 2.25L15 17l2.25.75L18 20l.75-2.25L21 17l-2.25-.75L18 14Z" />
+      <path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8ZM12 18v4" />
     </Icon>
   );
 }

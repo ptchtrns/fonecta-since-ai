@@ -11,18 +11,20 @@ pnpm install && pnpm db:migrate && pnpm db:seed
 
 python3 apps/predictor/run.py                 # 2026 season → predictions_2026.csv + score on dev businesses
 python3 apps/predictor/run.py --season 2025   # back-test as if today were 6 Nov 2025
-python3 apps/predictor/run.py --save local    # also show the 2026 predictions at /dashboard/suggestions
+python3 apps/predictor/run.py --save local    # also show the 2026 predictions on the dashboard
 ```
 
 Demo: TODO
 
+To see the whole loop locally, start the web app (`pnpm dev`) and sign up at `/login?mode=sign-up`, choosing one of the demo businesses from the list. To publish approved hours to the dataset's Yext mock, run `python3 data/fonecta-connect-suggests-2026/mock_api/server.py` and set `YEXT_API_URL` in `apps/web/.dev.vars`. The mock only accepts changes to hours and name, so edits to other business details show its error.
+
 ## The five steps
 
 - **Detect:** `apps/predictor` compares what Google shows with what each business most likely does on every special day, using the business's own past entries, its shopping centre, similar businesses and customer reviews read by language models. Businesses that customers say have shut down for good are flagged for a person to check. See [apps/predictor/README.md](apps/predictor/README.md).
-- **Suggest:** TODO
-- **Contact:** TODO
-- **Owner decides (no login):** TODO
-- **Apply + confirm:** TODO
+- **Suggest:** the dashboard lists a business's suggestions with the reasons, most important first: how sure the predictor is, how many Google views that day had last season, and how soon it is. Each is also compared with pages the owner linked under Sources.
+- **Contact:** WhatsApp, in the owner's language, one suggestion at a time. The next goes out after the previous is answered. A suggestion that a linked page disagrees with is never sent.
+- **Owner decides (no login):** the message has Approve, Edit and No thanks buttons and a link to a page that needs no login. The token in the link only answers that one suggestion. The dashboard offers the same three answers.
+- **Apply + confirm:** an approved change is written to Yext as the full hours object, and the owner is told which sites show it and how soon. If Yext rejects it nothing is recorded, so the suggestion stays open. Without a Yext connection the decision is saved and the UI says it isn't live yet. Standing permission applies public holidays without asking when the predictor is at least 70% sure and no linked page disagrees.
 
 ## Data sources that mattered most (3–5)
 
@@ -53,11 +55,36 @@ When an owner has never entered anything for a holiday, the predictor falls back
 - **Recent reviews** where customers found the doors closed on that holiday, and **Google users' suggested hours** for the same holiday last time.
 - **Seasons and snow:** summer terraces in winter, ski rentals in summer, and ski rentals when there isn't enough snow.
 
-Otherwise it stays quiet, because owners with no history almost always keep their normal hours (see above). TODO: show `FI-D0017` Kahvila Kipinä in the demo.
+Otherwise it stays quiet, because owners with no history almost always keep their normal hours (see above). `FI-D0017` Kahvila Kipinä shows this: sign up with it and it gets four suggestions, all from those sources. TODO: show it in the demo.
 
 ## Final customer messages (as text)
 
-TODO
+From `apps/web/src/lib/messages.ts`, with buttons Approve / Edit / No thanks (in the owner's language):
+
+> Hei Aleksi! Joulupäivä on pe 25.12. Google näyttää nyt 07:30–18:00.
+> Perustuu aiempina vuosina tälle päivälle antamiisi aikoihin.
+> 39% samanlaisista lähialueen yrityksistä kertoo olevansa kiinni tänä päivänä.
+>
+> Ehdotamme: *pe 25.12. suljettu*
+>
+> Muokkaa tai katso perustelut: https://…/s/…
+
+> Hi Aleksi! Christmas Day is on Fri 25.12. Google now shows 07:30–18:00.
+> Based on what you entered for this day in previous years.
+>
+> We suggest: *Fri 25.12. closed*
+>
+> Edit or see why: https://…/s/…
+
+Confirmation after approving:
+
+> Done! Fri 25.12. closed is updated.
+> Live now on Google (Search & Maps), Finder.fi / Fonecta.fi.
+> Apple Maps, Bing: within 2 d.
+
+After standing permission:
+
+> As agreed, we've updated the hours for Tilitoimisto Otso: Fri 25.12. closed, Fri 1.1. closed.
 
 ## Bonus: live source
 
@@ -72,5 +99,7 @@ TODO
 | Qwen2.5-72B-Instruct, used through Featherless to read reviews of Finnish businesses | Qwen licence (commercial use allowed below 100 million monthly users) |
 | Mistral-Small-24B-Instruct-2501, used through Featherless to read reviews of Swedish and Norwegian businesses | Apache 2.0 |
 | TODO: web app and worker dependencies | |
+| Publisher logos from [Simple Icons](https://simpleicons.org) | CC0 |
+| Icons from [Lucide](https://lucide.dev) | ISC |
 
 No GPL/AGPL components without Fonecta's written approval.
