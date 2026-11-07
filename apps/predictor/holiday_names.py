@@ -5,6 +5,7 @@
 HOLIDAY_NAMES = [
     # Finnish (word stems, so that inflected forms like "tapaninpäivänä" match)
     ("aatonaatto", "DEC23"),
+    ("jouluaattoa edeltävä", "DEC23"),
     ("jouluaatto", "XMAS_EVE"),
     ("joulupäiv", "XMAS_DAY"),
     ("tapaninpäiv", "BOXING_DAY"),
@@ -32,6 +33,7 @@ HOLIDAY_NAMES = [
     ("juhannuspäiv", "MIDSUMMER_DAY"),
     # Swedish
     ("lillejulafton", "DEC23"),
+    ("dagen före julafton", "DEC23"),
     ("julafton", "XMAS_EVE"),
     ("juldag", "XMAS_DAY"),
     ("annandag jul", "BOXING_DAY"),
@@ -58,6 +60,7 @@ HOLIDAY_NAMES = [
     ("midsommardag", "MIDSUMMER_DAY"),
     # Norwegian
     ("lille julaften", "DEC23"),
+    ("dagen før julaften", "DEC23"),
     ("julaften", "XMAS_EVE"),
     ("første juledag", "XMAS_DAY"),
     ("andre juledag", "BOXING_DAY"),
@@ -78,6 +81,7 @@ HOLIDAY_NAMES = [
     ("første pinsedag", "PENTECOST"),
     ("andre pinsedag", "WHIT_MONDAY"),
     # English
+    ("day before christmas eve", "DEC23"),
     ("christmas eve", "XMAS_EVE"),
     ("christmas day", "XMAS_DAY"),
     ("boxing day", "BOXING_DAY"),

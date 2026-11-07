@@ -280,14 +280,18 @@ def check(season, training_rows):
 
         business = data["businesses"][question["entity_id"]]
         options = options_for(data, business, question, shown, rejected)
-        if not options:
-            continue
-        models = fold_models[fold_of(question["entity_id"])]
-        X = as_matrix([option["features"] for option in options], features)
-        expected = sum(model.predict(X) for model in models) / len(models)
-        best = int(expected.argmax())
-        if expected[best] > MIN_EXPECTED_POINTS:
-            predictions[key] = ("SUGGEST", options[best]["hours"], None)
+        if options:
+            models = fold_models[fold_of(question["entity_id"])]
+            X = as_matrix([option["features"] for option in options], features)
+            expected = sum(model.predict(X) for model in models) / len(models)
+            best = int(expected.argmax())
+            if expected[best] > MIN_EXPECTED_POINTS:
+                predictions[key] = ("SUGGEST", options[best]["hours"], None)
+                continue
+        # As in run.py: where the decider stays quiet, the hours a customer wrote down.
+        stated = run.stated_hours_suggestion(data, business, question, shown, rejected)
+        if stated:
+            predictions[key] = ("SUGGEST", stated["hours"], None)
     return score(predictions, settings["answers"])["score_0_100"]
 
 

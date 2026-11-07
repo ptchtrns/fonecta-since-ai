@@ -56,10 +56,13 @@ Otherwise it collects clues. Each clue looks at one kind of evidence and may pro
 - how often similar businesses and businesses of the same type close
 - hours a Google user suggested last time
 - seasonal breaks, and for ski rentals, the snow
+- new normal hours a customer wrote down, like "Now only open Mon-Fri 10-18, Sat 10-15"
 
 Clues that propose the same hours back each other up, and each of them gives the owner a reason. Clues also report the evidence behind them even when they stay silent, for example that 45% of cafes closed, which is too few to suggest closing on its own.
 
 The decider then weighs the options. It is a model that learned from earlier seasons which combinations of evidence turned out right. For each option it predicts how many points the suggestion would earn, and suggests the best one only if it expects to be right more often than wrong. A wrong suggestion costs as much as a right one earns, and owners who never tell us anything mostly keep their normal hours, so staying quiet is often the better choice.
+
+When the decider stays quiet, one more clue gets its say: a customer review that states the business's new normal hours, like "Nykyään auki vain ma-pe 7.30-18, la 9-17". Owners who change their normal hours often forget the listing, and customers notice. These reviews matched the true current hours on every weekday checked. The decider can't learn this clue, because past seasons have almost none of these reviews, so it comes after the decider instead of inside it.
 
 The model learned from the training businesses' true hours in the 2024 and 2025 seasons and three springs, and from the owners' answers in the 2025 pilot. The back-test's model only learned from what was known before 6 Nov 2025.
 
@@ -85,21 +88,22 @@ Right hours earn 1 point and hours within 30 minutes 0.6. Getting open or closed
 
 ## Scores so far
 
-| Change                                                              | 2026  | 2025 back-test |
-| ------------------------------------------------------------------- | ----- | -------------- |
-| Do nothing                                                          | 0     | -              |
-| Last year's hours                                                   | 57.85 | -              |
-| Plus peers ("closed" when at least 20% of similar businesses close) | 64.14 | 59.95          |
-| Last year: confidence from all past years, weekday adjustment       | 64.17 | 60.34          |
-| Plus the shopping centre's hours                                    | 64.58 | 61.40          |
-| Clues combined by confidence instead of a fixed order               | 64.55 | 61.20          |
-| Plus type habits (no own history, at least 80% of the type closed)  | 65.00 | 61.80          |
-| Plus the closed-for-good flag                                       | 65.22 | 61.80          |
-| Plus Google edits, snow, seasonal breaks and reviews                | 66.27 | 63.35          |
-| Plus owners' answers                                                | 66.69 | 63.36          |
-| A learned decider instead of "highest confidence wins"              | 67.58 | 65.02          |
+| Change                                                                                               | 2026  | 2025 back-test |
+| ---------------------------------------------------------------------------------------------------- | ----- | -------------- |
+| Do nothing                                                                                           | 0     | -              |
+| Last year's hours                                                                                    | 57.85 | -              |
+| Plus peers ("closed" when at least 20% of similar businesses close)                                  | 64.14 | 59.95          |
+| Last year: confidence from all past years, weekday adjustment                                        | 64.17 | 60.34          |
+| Plus the shopping centre's hours                                                                     | 64.58 | 61.40          |
+| Clues combined by confidence instead of a fixed order                                                | 64.55 | 61.20          |
+| Plus type habits (no own history, at least 80% of the type closed)                                   | 65.00 | 61.80          |
+| Plus the closed-for-good flag                                                                        | 65.22 | 61.80          |
+| Plus Google edits, snow, seasonal breaks and reviews                                                 | 66.27 | 63.35          |
+| Plus owners' answers                                                                                 | 66.69 | 63.36          |
+| A learned decider instead of "highest confidence wins"                                               | 67.58 | 65.02          |
+| Plus new normal hours that customers wrote down in reviews, and reviews saying "everything was dark" | 68.29 | 65.16          |
 
-The decider's scores come from `train.py --check`, where each training business is decided by a model that never saw it, as the hidden test businesses will be. `run.py` prints higher numbers (68.29 and 65.85) because the saved models also learned from these businesses' earlier seasons.
+The decider's scores come from `train.py --check`, where each training business is decided by a model that never saw it, as the hidden test businesses will be. `run.py` prints higher numbers because the saved models also learned from these businesses' earlier seasons.
 
 ## What we tried that didn't work
 
@@ -119,6 +123,11 @@ The decider's scores come from `train.py --check`, where each training business 
 - What businesses within a kilometre entered for the same holiday. Owners without history did close more often where their neighbours had, but the decider gained only 0.03 to 0.05 points: the type and peer rates already say the same.
 - Trends by area, like a whole town closing an hour earlier. When businesses changed their hours, a business matched its city's most common closing time 28% of the time, against 22% for everyone together and 42% for its own type. The type matters, the town hardly at all.
 - Reviews that complain about the hours without naming the holiday, matched to the nearest special day before they were written. Only 20 of 32 "closed" readings matched what really happened that day, against about 9 in 10 for reviews that name the holiday.
+- A language model reading everything about a business (all reviews with the owner's replies, Google edits, customer activity on past special days, similar businesses) and judging the days owners never told us about. On 39 businesses it scored 17.7 on those days against the decider's 36.7, and it told closed days apart no better than the type's closing rate alone (0.949 against 0.950 on a scale where 1.0 is perfect). It found nothing in the raw data beyond the numbers we gave it.
+- Event nights. About one bar or restaurant in six stays open an hour or two longer, but how big the event is or what kind (hockey, concert, festival) makes no difference, so nothing tells which ones will.
+- The type's closing rate counted only among owners who never told us anything, or split by weekday and weekend. Neither ranked the days better than the plain rate.
+- Businesses with the same name as a chain. Same-name businesses behaved no more alike than any two businesses of the same type: the names are just reused.
+- Last year's hours both as entered and moved to this year's weekday, the most common answer over the years, and where the owner's newest entry came from (the owner, Fonecta support, an accepted suggestion). Better in the 2025 back-test, worse in 2026.
 - A small language model on a laptop for reading reviews. It read Finnish "ovet olivat kiinni" (the doors were closed) as open until we gave it a word list.
 
 ## Where the points are lost
@@ -134,7 +143,7 @@ If we knew exactly what every business did on the same holiday last time and rep
 
 ## Ideas
 
-- Owners who changed their normal hours and never updated the listing. Customers notice and suggest new weekly hours, but those edits are almost always wrong on listings that are up to date. It needs a second sign, like a review saying the hours have changed.
+- Owners who changed their normal hours and never updated the listing, but have no review stating the new hours. 14 of 15 dev businesses with a review like "new owner and new hours, Google has the old ones" really were outdated, but without the new hours the best guess ("opens an hour later", the most common change) would be right only about four times in ten.
 - Events and school holidays. Few rows, but two demo stories need them: the bar next to the arena (FI-D0010) and the play centre in school holidays (FI-D0014).
 - A language model that writes the owner messages and understands free-text replies like "we close at 3 instead".
 
