@@ -58,6 +58,10 @@ const DOMAINS: Record<string, string> = {
   Tripadvisor: 'tripadvisor.com',
   Fonecta: 'fonecta.fi',
   WhatsApp: 'whatsapp.com',
+  Messenger: 'messenger.com',
+  Telegram: 'telegram.org',
+  Signal: 'signal.org',
+  Viber: 'viber.com',
 };
 
 /** Logo.dev image URL for a site, or undefined when there's no key or no known domain. */
