@@ -5,13 +5,12 @@
 # ///
 """Load the Connect Suggests dataset into D1.
 
-    pnpm db:migrate && pnpm db:seed             # demo set, local
-    pnpm db:seed:full                           # everything, local
-    pnpm --filter web db:seed:remote            # demo set, deployed database
+    pnpm db:migrate && pnpm db:seed             # everything, local (3.5M rows, 272 MB)
+    pnpm db:seed:limited                        # limited set, local
+    pnpm --filter web db:seed:remote            # limited set, deployed database
 
-The demo set is small enough for D1's free plan: the demo businesses and shopping centres, with weather and
-peer data limited to what they use, and analytics and daily weather limited to SUBSET_SINCE onwards. Use
---all for everything (3.5M rows, 272 MB).
+The limited set (--limited) is small enough for D1's free plan: the demo businesses and shopping centres, with
+weather and peer data limited to what they use, and analytics and daily weather limited to SUBSET_SINCE onwards.
 
 Every dataset table is emptied and refilled, so it is safe to re-run. App tables (user, job, ...) are not
 touched. Wrangler runs the generated SQL, so run this from anywhere; it switches to apps/web itself.
@@ -34,7 +33,7 @@ DEFAULT_DATA_DIR = WEB_DIR.parents[1] / "data" / "fonecta-connect-suggests-2026"
 MAX_STATEMENT_BYTES = 90_000
 MAX_FILE_BYTES = 64 * 1024 * 1024
 
-# The demo set: which businesses, and how far back its daily tables go. This keeps last year's holidays.
+# The limited set: which businesses, and how far back its daily tables go. This keeps last year's holidays.
 SUBSET_SPLITS = ("demo", "reference")
 SUBSET_SINCE = "2025-11-01"
 
@@ -444,7 +443,7 @@ TABLES = {
 
 
 def subset_filter():
-    """Return a predicate (table, row) -> bool that keeps only what the demo set needs."""
+    """Return a predicate (table, row) -> bool that keeps only what the limited set needs."""
     tiers = {r["city"]: r["city_tier"] for r in read_csv("data/cities.csv")}
     ids = {r["entity_id"] for r in read_csv("data/splits.csv") if r["split"] in SUBSET_SPLITS}
     chosen = [e for e in read_json("data/entities.json")["response"]["entities"] if e["meta"]["id"] in ids]
@@ -535,7 +534,7 @@ def main():
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--local", action="store_true", help="load the local D1 database")
     target.add_argument("--remote", action="store_true", help="load the deployed D1 database")
-    parser.add_argument("--all", action="store_true", help="load everything instead of the demo set")
+    parser.add_argument("--limited", action="store_true", help="load the limited set instead of everything")
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--persist-to", type=Path, help="local state directory, passed to wrangler")
     parser.add_argument("--skip", nargs="*", default=[], choices=TABLES, metavar="TABLE", help="tables to leave alone")
@@ -543,10 +542,11 @@ def main():
 
     data_dir = args.data_dir
     tables = {name: rows for name, rows in TABLES.items() if name not in args.skip}
-    keep = None if args.all else subset_filter()
+    keep = subset_filter() if args.limited else None
 
     if args.remote:
-        answer = input(f"This empties and refills {len(tables)} tables in the REMOTE database. Type 'yes': ")
+        load = "the limited set" if args.limited else "ALL the data, which exceeds D1's free plan write limit,"
+        answer = input(f"This empties {len(tables)} tables in the REMOTE database and loads {load}. Type 'yes': ")
         if answer != "yes":
             sys.exit("Aborted.")
 
