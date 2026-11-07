@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from clues import (
+    flag_if_closed_for_good,
     guess_from_last_year,
     guess_from_mall,
     guess_from_peers,
@@ -55,9 +56,9 @@ def main():
         writer = csv.writer(file)
         writer.writerow(["entity_id", "date", "action", "hours", "confidence"])
         for question in questions:
-            suggestion = suggest(data, season, question)
-            if suggestion:
-                writer.writerow([question["entity_id"], question["date"], "SUGGEST", suggestion["hours"], suggestion["confidence"]])
+            answer = decide(data, season, question)
+            if answer:
+                writer.writerow([question["entity_id"], question["date"], answer["action"], answer.get("hours", ""), answer.get("confidence", "")])
 
     print(f"Wrote {season['output'].name}")
     subprocess.run([
@@ -67,11 +68,15 @@ def main():
     ])
 
 
-def suggest(data, season, question):
-    """The hours to suggest for one business on one day, or None to stay quiet."""
+def decide(data, season, question):
+    """What to do for one business on one day: a FLAG, a SUGGEST with hours, or None to stay quiet."""
     business = data["businesses"][question["entity_id"]]
     holiday = question["day_key"]
     day = question["date"]
+
+    flag = flag_if_closed_for_good(data, business)
+    if flag:
+        return flag
 
     guess = combine([
         guess_from_mall(data, business, day),
@@ -90,7 +95,7 @@ def suggest(data, season, question):
 
     if guess["hours"] == shown:
         return None  # Google already shows it
-    return guess
+    return dict(guess, action="SUGGEST")
 
 
 if __name__ == "__main__":

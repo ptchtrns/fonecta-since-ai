@@ -23,6 +23,7 @@ def load_everything(snapshot):
         "businesses": businesses,
         "holiday_history": holiday_history,
         "holiday_history_by_date": group_by_date(holiday_history),
+        "last_owner_entry": last_entry_per_business(holiday_history),
         "regular_hours_history": load_regular_hours_history(snapshot),
         "peers": load_peers(),
         "city_sizes": load_city_sizes(),
@@ -62,6 +63,15 @@ def group_by_date(holiday_history):
         for entry in entries:
             by_date[(entry["entity_id"], entry["date"])].append(entry)
     return by_date
+
+
+def last_entry_per_business(holiday_history):
+    """The day each business last entered any special hours, by business ID."""
+    last_entry = {}
+    for (business_id, _), entries in holiday_history.items():
+        for entry in entries:
+            last_entry[business_id] = max(last_entry.get(business_id, ""), entry["entered_at"][:10])
+    return last_entry
 
 
 def load_regular_hours_history(snapshot):

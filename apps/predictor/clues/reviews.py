@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 
 from holiday_names import find_holiday
-from review_reading import is_about_hours, what_customer_found
+from review_reading import is_about_hours, read_review
 
 # Older reviews describe how the business ran too long ago. 400 days covers last year's whole
 # season, including Easter, which moves around.
@@ -19,7 +19,7 @@ def guess_from_reviews(data, business, holiday):
         if not text or not is_about_hours(text) or find_holiday(text) != holiday:
             continue
 
-        if what_customer_found(text) == "closed":
+        if read_review(text, business["meta"]["countryCode"])["found"] == "closed":
             return {
                 "hours": "closed",
                 "confidence": REVIEW_CONFIDENCE,

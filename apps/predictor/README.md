@@ -13,14 +13,21 @@ python3 apps/predictor/run.py                 # 2026 season → predictions_2026
 python3 apps/predictor/run.py --season 2025   # back-test: pretends today is 6 Nov 2025
 ```
 
-The reviews clue asks a local language model, so [Ollama](https://ollama.com) has to be running with the model pulled:
+The reviews are read by language models on [Featherless](https://featherless.ai). Put the key in the `.env` file in the repo root (gitignored):
 
-```sh
-ollama pull qwen3:1.7b
-ollama serve
+```
+FEATHERLESS_API_KEY=...
 ```
 
-The first run reads up to ~1,300 reviews per season, about an hour on a laptop. Every answer is saved in `ai_cache.json`, so later runs take seconds.
+Every answer is saved in `ai_cache.json`, which is committed, so a run only asks about reviews nobody has read yet. To read new reviews in batches and keep an eye on cost:
+
+```sh
+python3 apps/predictor/read_reviews.py 300     # read the next 300 unread reviews
+python3 apps/predictor/read_reviews.py clean   # drop cached answers nothing uses any more
+python3 apps/predictor/try_models.py           # test models on 25 hand-labelled reviews
+```
+
+Reading all ~1,350 reviews costs about 15 cents. Setting `PROVIDER = "ollama"` in `ai.py` runs a local model instead, but the small ones that fit a laptop read Finnish badly.
 
 A change should improve **both** seasons. The organisers score hidden businesses, and real customers have longer histories than this dataset, so rules should make sense in general, not just fit these numbers.
 
@@ -28,10 +35,11 @@ A change should improve **both** seasons. The organisers score hidden businesses
 
 For every question (one business on one day):
 
-1. Work out what Google shows for that day (`hours.py`).
+1. If the business seems to have shut down for good while Google still shows it open, flag it for a person to check (`clues/closed_for_good.py`) and stop there.
 2. Ask every clue for a guess. A clue answers with hours, a confidence and a reason, or with nothing.
 3. `combine.py` adds up the clues: clues that suggest the same hours back each other up, and the hours with the highest combined confidence win.
-4. If the winning hours differ from what Google shows, suggest them. Otherwise do nothing.
+4. Work out what Google shows for that day (`hours.py`).
+5. If the winning hours differ from what Google shows, suggest them. Otherwise do nothing.
 
 ## Files
 
@@ -41,15 +49,17 @@ For every question (one business on one day):
 | `load.py` | Reads every data file once, groups the rows by business and drops everything from on or after the snapshot date, so no clue can look into the future | Done |
 | `hours.py` | What Google shows: `shown_on_google_now` (2026, from entities.json, matches the labels exactly) and `shown_on_google_back_then` (2025 back-test, rebuilt from history, 27 of 11,118 rows differ). Also `normal_hours` | Done |
 | `combine.py` | Combines the clues: agreeing clues raise the confidence, `1 - (1 - c1) × (1 - c2) × …`, so two clues at 0.7 give 0.91 | Done |
-| `ai.py` | `ask(question, instructions)` asks the local language model (Ollama, `qwen3:1.7b`) and returns its JSON answer. Every answer is cached in `ai_cache.json` | Done |
+| `ai.py` | Asks a language model on Featherless (or a local one through Ollama) and returns its JSON answer. Every answer is cached in `ai_cache.json`. Waits and tries again while Featherless is busy, and stops a run after 2 million tokens | Done |
 | `holiday_names.py` | Holiday names as customers write them, in fi/sv/nb/en. `find_holiday(text)` was right for 99.9% of reviews, checked against the review dates | Done |
-| `review_reading.py` | Is a review about opening hours, and what did the customer find (asks the AI, with a small word table that fixed Finnish) | Done |
+| `review_reading.py` | Asks the model what a review says (closed, closed early, opened late, open, shut down for good, or nothing useful) and, for closed early or opened late, which times it gives. Finnish businesses' reviews go to Qwen2.5-72B, Swedish and Norwegian ones to Mistral-Small 24B. `PROMPT_NOTES.md` explains how the instructions were written | Done |
+| `read_reviews.py` | Reads the reviews the clues need, in batches, and cleans the cache | Done |
+| `try_models.py` | Tests models on 25 hand-labelled reviews | Done |
 | `clues/last_year.py` | Suggests the newest year's hours. Confidence = how much past years agree, recent years count more (`YEAR_WEIGHT_DECAY`). Adjusts for the holiday falling on a different weekday | Done |
 | `clues/mall.py` | Shop in a shopping centre that published hours for the day: suggest the centre's exact hours (shops did this ~250 times vs 6 times keeping their own opening time) | Done |
-| `clues/reviews.py` | A review from the last 400 days says the doors were closed on this holiday: suggest closed | Built, not scored yet |
+| `clues/reviews.py` | A review from the last 400 days says the doors were closed on this holiday: suggest closed. Closed-early reviews with a closing time aren't used yet | Built, reviews being read |
 | `clues/type_habits.py` | Owner never entered anything for this holiday: suggest closed when at least 80% of the same type and country really closed, learned from the training data | Done |
 | `clues/peers.py` | Suggests closed when at least 20% of similar businesses entered closed | Done |
-| `clues/closed_for_good.py` | Reviews or Google edits say the business shut down: flag it | Empty |
+| `clues/closed_for_good.py` | Flags a business when a recent review says it shut down for good, or a Google user reported it closed, and the owner hasn't entered anything since. Skipped when Google already shows it closed | Done |
 
 ## Using the data
 
@@ -179,6 +189,7 @@ Add it to `clues/__init__.py` and to the list passed to `combine` in `run.py`. T
 | 7 Nov | + mall clue (centre's exact hours, before last year) | 64.58 | 61.40 |
 | 7 Nov | `combine` instead of a fixed clue order | 64.55 | 61.20 |
 | 7 Nov | + type habits (no own history, ≥ 80% of the type closed) | 65.00 | 61.80 |
+| 7 Nov | + closed-for-good flag (catches 1 of the 2 dev businesses; the other has no review or edit to go on) | 65.22 | 61.80 |
 
 Scores from 7 Nov onwards are without the reviews clue, which hasn't had its first full run yet.
 
@@ -222,7 +233,7 @@ Each idea starts from why it should work for real businesses, not from the dev s
 
 ## AI ideas we haven't built yet
 
-1. **A bigger model for the reviews.** The local 1.7B model needs a word table to read Finnish at all. A cloud model (Featherless or Gemini) would be more reliable and could also read the reviews we skip today, like "came on the holiday" without naming it, by matching the review date to the nearest holiday.
+1. **Reviews that don't name the holiday.** "Came here on the holiday but it was closed" could be matched to the nearest holiday by the date the review was written.
 2. **An AI judge for disagreements.** When clues disagree (a few hundred cases per season), give a model all the evidence: the owner's past entries, the centre's hours, reviews, edits, what similar businesses do. Ask for the hours, how sure it is and a reason for the owner. This is the kind of judgement where rules struggle, like "the centre published new hours, but this owner has kept their own hours for three years".
 3. **Reading times and changes from reviews.** A model can pull "closed at 20:00", "klo 16.20" or "kl. 14" out of any language and tell apart "closed at" from "arrived at". That's what ideas 3 and 4 above need.
 4. **Spotting outdated normal hours.** Per business, give the model its reviews, its weekly-hours edits and its current listing, and ask: have the normal hours changed, and to what?
@@ -233,6 +244,8 @@ Each idea starts from why it should work for real businesses, not from the dev s
 
 ## Next steps
 
-1. `clues/closed_for_good.py`
-2. First full run with the reviews clue, then tune `REVIEW_CONFIDENCE`
-3. Pick from the ideas above, starting with 2 and 3 (they're about data we don't use at all yet)
+1. Finish reading the reviews, score the reviews clue on both seasons and set `REVIEW_CONFIDENCE`. On dev businesses, about 9 in 10 reviews read as "closed" were about days the business really was closed.
+2. Use the closing times from "closed early" reviews to suggest shorter hours.
+3. Export the review readings with business IDs (`review_readings.csv`), so the website and the owner messages can quote them.
+4. The AI judge for when clues disagree (AI idea 2).
+5. Ideas 2 and 3 above: they use data we don't use at all yet.
