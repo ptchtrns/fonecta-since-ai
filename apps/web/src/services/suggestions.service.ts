@@ -19,8 +19,10 @@ import { t } from '~/lib/messages';
 import { err, ok } from '~/lib/result';
 import type { DecidePayload } from '~/schemas/business.schema';
 import { db } from '~/server/db';
+import { log } from '~/server/log';
 import { updateEntity } from '~/server/yext';
 import { getBusiness, liveSites, withApproved, type Business } from '~/services/business.service';
+import { queuePredictionRefresh } from '~/services/predictions.service';
 
 export const FLAG_KEY = 'closed-for-good';
 export const today = () => new Date().toISOString().slice(0, 10);
@@ -324,6 +326,14 @@ export async function decide(entityId: string, key: string, input: DecidePayload
       publishedAt: published ? now : null,
     })
     .where(and(eq(suggestionState.entityId, entityId), eq(suggestionState.suggestionKey, key)));
+
+  // The answer can change what is likely on the business's other days. A failed refresh only means the
+  // suggestions stay as they were until the next full run.
+  try {
+    await queuePredictionRefresh(entityId);
+  } catch (error) {
+    log.warn('predictions', 'refresh not queued', { entityId, error });
+  }
 
   const decision: Decision = {
     status,

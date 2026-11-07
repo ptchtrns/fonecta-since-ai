@@ -9,7 +9,8 @@ import { db } from '~/server/db';
 const STALE_AFTER_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 
-export async function enqueueJob(userId: string, { type, payload }: CreateJobPayload) {
+/** userId is null for jobs the app queues itself, like refreshing a business's predictions. */
+export async function enqueueJob(userId: string | null, { type, payload }: CreateJobPayload) {
   const [row] = await db.insert(job).values({ id: crypto.randomUUID(), type, payload, userId }).returning();
   return ok(row!);
 }

@@ -38,6 +38,31 @@ def guess_from_last_year(data, business, holiday, day):
     }
 
 
+def last_year_evidence(data, business, holiday):
+    """How much the owner's own history says about this holiday, also when it's thin, for the decider.
+    -1 when there is no history."""
+    answers = past_answers(data, business, holiday)
+    if not answers:
+        return {"own_years": 0.0, "own_entries": 0.0, "own_years_since_newest": -1.0, "own_consistency": -1.0}
+
+    years = set()
+    for day, _ in answers:
+        years.add(day[:4])
+
+    # Years between the snapshot and the newest entry. -1 for an entry from the snapshot's own year,
+    # like a January holiday; capped at 3, as older entries say little more.
+    newest_year = int(answers[-1][0][:4])
+    years_since = int(data["snapshot"][:4]) - newest_year
+    years_since = max(-1, min(years_since, 3))
+
+    return {
+        "own_years": float(len(years)),
+        "own_entries": float(len(answers)),
+        "own_years_since_newest": float(years_since),
+        "own_consistency": consistency([answer for _, answer in answers]),
+    }
+
+
 def past_answers(data, business, holiday):
     """What the owner entered for this holiday in past years, as [(day, hours)], oldest first.
 

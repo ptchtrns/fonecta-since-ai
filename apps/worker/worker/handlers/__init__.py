@@ -7,10 +7,11 @@ Raise an exception to mark the job as failed. Register new handlers in HANDLERS.
 from collections.abc import Callable
 from typing import Any
 
-from . import echo
+from . import echo, predict_business
 
 Handler = Callable[[dict[str, Any]], dict[str, Any]]
 
 HANDLERS: dict[str, Handler] = {
     "echo": echo.handle,
+    "predict-business": predict_business.handle,
 }
