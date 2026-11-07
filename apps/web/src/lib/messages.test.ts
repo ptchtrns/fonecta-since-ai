@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vite-plus/test';
-import { confirmationMessage, suggestionButtons, suggestionMessage, translateReason } from '~/lib/messages';
+import {
+  confirmationMessage,
+  suggestionButtons,
+  suggestionMessage,
+  suggestionSubject,
+  translateReason,
+} from '~/lib/messages';
 import { importanceLabel, importanceScore, meetsImportance } from '~/lib/importance';
 import { groupWeek } from '~/lib/hours';
 
@@ -53,18 +59,34 @@ describe('suggestionMessage', () => {
     url: 'https://x/s/abc',
     language: 'fi' as const,
   };
-  test('leads with the question, then the suggestion, the customer impact and one reason', () => {
+  test('leads with the day and a yes-or-no question, then what Google shows, then why', () => {
     const body = suggestionMessage(input);
     const lines = body.split('\n');
-    expect(lines[0]).toBe('Hei Aleksi! *Vahvista aukioloaikasi: Jouluaatto to 24.12.*');
-    expect(lines[1]).toBe('Ehdotamme: *07:30–13:00*. Google näyttää nyt 07:30–18:00.');
-    expect(lines[2]).toContain('Noin 18 ihmisen');
-    expect(body).toContain('Perustuu aiempina vuosina');
+    expect(lines[0]).toBe('📅 *Jouluaatto, to 24.12.*');
+    expect(lines[1]).toBe('Hei Aleksi! Oletteko auki *07:30–13:00*?');
+    expect(lines[2]).toBe('Google nyt: 07:30–18:00');
+    expect(body).toContain('💡 Perustuu aiempina vuosina');
+    expect(body).toContain('👥 Noin 18 ihmistä');
     expect(body).not.toContain('39%');
-    expect(body).toContain('https://x/s/abc');
+    expect(body.split('\n').at(-1)).toContain('https://x/s/abc');
+  });
+  test('asks a closure as its own question', () => {
+    const lines = suggestionMessage({ ...input, suggested: 'closed', language: 'en' }).split('\n');
+    expect(lines[1]).toBe('Hi Aleksi! Are you *closed* that day?');
   });
   test('leaves the impact out when almost nobody looks the business up', () => {
-    expect(suggestionMessage({ ...input, views: 1, language: 'en' })).not.toContain('expected to look');
+    expect(suggestionMessage({ ...input, views: 1, language: 'en' })).not.toContain('👥');
+  });
+});
+
+describe('suggestionSubject', () => {
+  test('is the question in a few words', () => {
+    expect(suggestionSubject({ dayName: 'Christmas Eve', suggested: '07:30-13:00', language: 'en' })).toBe(
+      'Christmas Eve: open 07:30–13:00?',
+    );
+    expect(suggestionSubject({ dayName: 'Joulupäivä', suggested: 'closed', language: 'fi' })).toBe(
+      'Joulupäivä: kiinni?',
+    );
   });
 });
 
@@ -77,9 +99,9 @@ describe('suggestionButtons', () => {
       }
     }
     expect(suggestionButtons('closed', 't', 'en').map((b) => b.title)).toEqual([
-      'Confirm closed',
-      "We're open – edit",
-      'Dismiss',
+      "Yes, we're closed",
+      "No, we're open",
+      'Keep as it is',
     ]);
     expect(suggestionButtons('closed', 't', 'en').map((b) => b.id)).toEqual([
       'approve:t',

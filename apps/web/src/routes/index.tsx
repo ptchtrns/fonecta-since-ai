@@ -218,7 +218,12 @@ export default function Landing() {
               Sign in
             </a>
           </nav>
-          <p class="text-sm text-base-content/40">Prototype for the Fonecta challenge</p>
+          <p class="text-sm text-base-content/40">
+            Prototype for the Fonecta challenge ·{' '}
+            <a href="https://logo.dev" class="hover:text-base-content">
+              Logos provided by Logo.dev
+            </a>
+          </p>
         </div>
       </footer>
     </>

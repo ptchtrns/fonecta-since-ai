@@ -116,6 +116,12 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/api/telegram/webhook";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/telegram/webhook"), Extract<"POST", keyof typeof import("./src/routes/api/telegram/webhook")>>>;
+      $$route?: undefined;
+    },
+    {
       path: "/api/uploads";
       page: false;
       $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/uploads"), Extract<"GET", keyof typeof import("./src/routes/api/uploads")>>>;
@@ -157,9 +163,39 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/api/workspace/email";
+      page: false;
+      $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/email"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/email")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/email/test";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/email/test"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/email/test")>>>;
+      $$route?: undefined;
+    },
+    {
       path: "/api/workspace/link";
       page: false;
       $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/link"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/link")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/messages";
+      page: false;
+      $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/messages"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/messages")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/telegram";
+      page: false;
+      $DELETE: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/telegram"), Extract<"DELETE", keyof typeof import("./src/routes/api/workspace/telegram")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/telegram/test";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/telegram/test"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/telegram/test")>>>;
       $$route?: undefined;
     },
     {

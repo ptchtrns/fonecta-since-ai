@@ -3,10 +3,19 @@ import { desc, eq } from 'drizzle-orm';
 import { entity, outbox } from '~/db/schema';
 import { weekToText } from '~/lib/hours';
 import { db } from '~/server/db';
+import { emailEnabled } from '~/server/email';
+import { telegramEnabled } from '~/server/telegram';
 import { whatsappEnabled } from '~/server/whatsapp';
 import { publishes } from '~/server/yext';
 import { getBusiness } from '~/services/business.service';
-import { canContactNow, channelFor, previewMessage, sendable } from '~/services/contact.service';
+import {
+  canContactNow,
+  channelsFor,
+  connectedChannels,
+  previewMessage,
+  sendable,
+  telegramConnectLink,
+} from '~/services/contact.service';
 import { getPresence } from '~/services/presence.service';
 import { listLinkedSources } from '~/services/sources.service';
 import { listSuggestions, upcomingExceptions } from '~/services/suggestions.service';
@@ -58,18 +67,37 @@ export async function getWorkspace(entityId: string, origin: string) {
     },
     suggestions,
     presence,
+    // What goes out on every channel, and the next message as it would look.
+    messages: {
+      language: business.contact.language,
+      minImportance: business.whatsapp.minImportance,
+      standingPermission: business.contact.standingPermission,
+      preview,
+    },
     whatsapp: {
       configured: whatsappEnabled(),
       phone: business.whatsapp.phone,
-      language: business.whatsapp.language,
       on: business.whatsapp.on,
-      minImportance: business.whatsapp.minImportance,
-      standingPermission: business.whatsapp.standingPermission,
-      preview,
     },
+    email: {
+      configured: emailEnabled(),
+      address: business.email.address,
+      on: business.email.on,
+    },
+    telegram: {
+      configured: telegramEnabled(),
+      connected: !!business.telegram.chatId,
+      name: business.telegram.name,
+      // Opens the bot with this business's token. Only while not connected.
+      connectUrl:
+        telegramEnabled() && !business.telegram.chatId ? await telegramConnectLink(business.id) : null,
+    },
+    // The owner's preferences from their customer record, and where messages go because of them.
     contact: {
       optedOut: business.contact.optedOut,
-      channel: channelFor(business),
+      preferred: business.contact.channel,
+      channels: channelsFor(business),
+      connected: connectedChannels(business),
       window: business.contact.window,
       timeZone: business.contact.timeZone,
       reachableNow: canContactNow(business),

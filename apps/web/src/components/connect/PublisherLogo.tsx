@@ -7,6 +7,15 @@ const ICONS: Record<string, { color: string; path: string }> = {
     color: '#25D366',
     path: 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z',
   },
+  Telegram: {
+    color: '#26A5E4',
+    path: 'M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z',
+  },
+  // Not a brand: a plain envelope.
+  Email: {
+    color: '#2563EB',
+    path: 'M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z',
+  },
   Google: {
     color: '#4285F4',
     path: 'M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z',
@@ -41,12 +50,16 @@ const ICONS: Record<string, { color: string; path: string }> = {
   },
 };
 
-// Logo.dev serves the real logo for a domain. Its publishable key is meant to be in the page. Without one,
-// or when an image fails to load, the Simple Icons mark above (or the first letter) is shown instead.
+// Logo.dev (https://www.logo.dev) serves the real logo for a domain. Its publishable key (pk_...) is meant to be
+// in the page. Without one, or when Logo.dev has no logo for the domain, the Simple Icons mark above (or the
+// first letter) is shown instead.
 const LOGO_DEV_TOKEN = import.meta.env.VITE_LOGO_DEV_TOKEN as string | undefined;
 
+// Keyed by the names sites go by here: the names in landing-page strips, `SITE_NAMES` in presence.service,
+// the dataset's publisher names and Yext's.
 const DOMAINS: Record<string, string> = {
   Google: 'google.com',
+  'Google (Search & Maps)': 'google.com',
   Facebook: 'facebook.com',
   Bing: 'bing.com',
   'Apple Maps': 'apple.com',
@@ -54,9 +67,19 @@ const DOMAINS: Record<string, string> = {
   HERE: 'here.com',
   MapQuest: 'mapquest.com',
   TomTom: 'tomtom.com',
+  Waze: 'waze.com',
   Yelp: 'yelp.com',
   Tripadvisor: 'tripadvisor.com',
+  Navmii: 'navmii.com',
+  ShowMeLocal: 'showmelocal.com',
+  Tupalo: 'tupalo.com',
+  // Nordic directories.
   Fonecta: 'fonecta.fi',
+  Eniro: 'eniro.se',
+  'Hitta.se': 'hitta.se',
+  'Gule Sider': 'gulesider.no',
+  '1881.no': '1881.no',
+  // Messaging channels.
   WhatsApp: 'whatsapp.com',
   Messenger: 'messenger.com',
   Telegram: 'telegram.org',
@@ -68,7 +91,8 @@ const DOMAINS: Record<string, string> = {
 export function logoUrl(name: string, size = 64) {
   const domain = DOMAINS[name];
   if (!LOGO_DEV_TOKEN || !domain) return undefined;
-  return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=${size}&format=png&retina=true`;
+  // fallback=404: a domain without a logo fails to load (and gets our fallback) rather than a generated monogram.
+  return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=${size}&format=png&retina=true&fallback=404`;
 }
 
 function Fallback(props: { name: string; box: string; svg: string }) {

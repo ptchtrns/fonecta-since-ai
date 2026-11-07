@@ -26,6 +26,7 @@ const channelLabels: Record<string, string> = {
   dashboard: 'here',
   link: 'from the link',
   whatsapp: 'on WhatsApp',
+  telegram: 'on Telegram',
   standing: 'automatically',
 };
 
@@ -181,7 +182,7 @@ export default function FrontPage() {
         </div>
 
         <aside class="flex flex-col gap-4" aria-label="Your profile at a glance">
-          <ConnectionsCard whatsapp={workspace().whatsapp} />
+          <ConnectionsCard workspace={workspace()} />
 
           <Card
             label="Profile"
@@ -219,16 +220,16 @@ export default function FrontPage() {
   );
 }
 
-/** Where suggestions reach the owner besides this page. WhatsApp is the only connection so far. */
-function ConnectionsCard(props: { whatsapp: Workspace['whatsapp'] }) {
-  const connections = () => [
-    {
-      name: 'WhatsApp',
-      on: props.whatsapp.on && !!props.whatsapp.phone,
-      detail: props.whatsapp.phone,
-      off: 'Not set up',
-    },
-  ];
+/** Where suggestions reach the owner besides this page. */
+function ConnectionsCard(props: { workspace: Workspace }) {
+  const connections = () => {
+    const { whatsapp, telegram, email } = props.workspace;
+    return [
+      { name: 'WhatsApp', on: whatsapp.on && !!whatsapp.phone, detail: whatsapp.phone, off: 'Not set up' },
+      { name: 'Telegram', on: telegram.connected, detail: telegram.name ?? 'Connected', off: 'Not set up' },
+      { name: 'Email', on: email.on && !!email.address, detail: email.address, off: 'Not set up' },
+    ];
+  };
   return (
     <Card
       label="Connections"

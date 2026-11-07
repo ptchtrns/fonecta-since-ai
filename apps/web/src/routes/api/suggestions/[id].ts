@@ -11,7 +11,7 @@ import {
   type ApiEvent,
 } from '~/server/http';
 import { getBusiness } from '~/services/business.service';
-import { sendNext } from '~/services/contact.service';
+import { sendNext, usesOwnChannel } from '~/services/contact.service';
 import { decide, FLAG_KEY } from '~/services/suggestions.service';
 
 /** The owner answers a suggestion on the dashboard. */
@@ -39,9 +39,9 @@ export async function POST(event: ApiEvent) {
     }
   }
 
-  // The owner may have been waiting on this one in WhatsApp too: move that conversation along.
+  // The owner may have been waiting on this one in WhatsApp, Telegram or email too: move that conversation along.
   const business = await getBusiness(user.entityId);
-  if (business?.whatsapp.on) await sendNext(business, publicOrigin(event.request));
+  if (business && usesOwnChannel(business)) await sendNext(business, publicOrigin(event.request));
 
   const { decision } = result;
   return json({ message: decisionMessage(params.data.id, decision.status, decision.sites), data: decision });

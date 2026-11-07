@@ -9,7 +9,8 @@ import { BusinessCombobox, type BusinessOption } from './BusinessCombobox';
 /** Picks the account's business: shown to accounts that don't have one, and in Account to change it. */
 export function ChooseBusiness(props: { title: string; current?: BusinessOption }) {
   const form = createFormState();
-  const [entityId, setEntityId] = createSignal(props.current?.id ?? '');
+  // Derived: `current` comes from the workspace query, which may still be loading when this mounts.
+  const [entityId, setEntityId] = createSignal(() => props.current?.id ?? '');
   const unchanged = () => !!props.current && entityId() === props.current.id;
 
   function onSubmit(event: SubmitEvent) {

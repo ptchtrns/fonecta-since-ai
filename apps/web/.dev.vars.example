@@ -19,3 +19,14 @@ WORKER_TOKEN=local-worker-token
 # Webhook for button replies at /api/whatsapp/webhook. Needs a public URL.
 # WHATSAPP_VERIFY_TOKEN=
 # WHATSAPP_APP_SECRET=
+# Email through Resend. RESEND_FROM must be on a domain verified in Resend; to try it out without one, use
+# "Connecta <onboarding@resend.dev>", which only delivers to your Resend account's own address.
+# RESEND_API_KEY=
+# RESEND_FROM=Connecta <suggestions@your-domain.com>
+# Telegram bot from @BotFather: its token and username (without the @). Updates arrive at /api/telegram/webhook,
+# which needs a public URL; register it once with the same secret:
+#   curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+#     -d url="$APP_URL/api/telegram/webhook" -d secret_token="$TELEGRAM_WEBHOOK_SECRET"
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_BOT_USERNAME=
+# TELEGRAM_WEBHOOK_SECRET=

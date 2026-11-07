@@ -32,6 +32,7 @@ const SITE_NAMES: Record<string, { name: string; logo?: string }> = {
   GOOGLEMYBUSINESS: { name: 'Google' },
   FONECTA_FINDER: { name: 'Finder.fi / Fonecta.fi', logo: 'Fonecta' },
   FONECTA_CALLER: { name: 'Fonecta Caller', logo: 'Fonecta' },
+  WAZE: { name: 'Waze (via Google)', logo: 'Waze' },
   CHATGPT_SEARCH: { name: 'AI assistants (via Bing and Apple)' },
   FIRSTPARTY: { name: 'Your review page' },
 };

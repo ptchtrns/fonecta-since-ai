@@ -1,7 +1,7 @@
 import { whatsappSchema } from '~/schemas/business.schema';
+import { savedReply } from '~/server/channel-replies';
 import {
   currentUser,
-  json,
   notFound,
   publicOrigin,
   readJson,
@@ -21,11 +21,5 @@ export async function PATCH(event: ApiEvent) {
 
   const [error, result] = await saveWhatsApp(user.entityId, validation.data, publicOrigin(event.request));
   if (error) return notFound();
-  if (result.error) return json({ message: `Saved, but WhatsApp didn't send it: ${result.error}` }, 502);
-
-  const parts = ['Saved.'];
-  if (result.applied)
-    parts.push(`${result.applied} holiday ${result.applied === 1 ? 'day' : 'days'} updated.`);
-  if (result.sent) parts.push('Your most important suggestion is on its way to WhatsApp.');
-  return json({ message: parts.join(' ') });
+  return savedReply('WHATSAPP', result);
 }
