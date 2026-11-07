@@ -49,8 +49,8 @@ export default function Sources() {
     <Page class="max-w-3xl">
       <Title>Sources · Connecta AI</Title>
       <PageHeader
-        title="Sources"
-        subtitle="How wrong suggestions are prevented: every one is checked against these."
+        title="Sources (extra)"
+        subtitle="This is an extra idea!! Not to be focused on. Do this only if we have extra time (unlikely). How wrong suggestions are prevented: every one is checked against these."
       />
 
       <Show when={disputed().length}>
