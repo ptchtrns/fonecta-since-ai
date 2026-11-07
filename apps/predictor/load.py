@@ -22,7 +22,7 @@ ALL_BUSINESSES = 3032
 HOW_TO_FILL = "Fill it from the repo root with: pnpm db:migrate && pnpm db:seed"
 
 
-def load_everything(snapshot):
+def load_everything(snapshot, include_live_answers=False):
     """Load all the data the clues use. snapshot is the date the run pretends is today."""
     businesses = load_businesses()
     holiday_history = load_holiday_history(snapshot)
@@ -45,6 +45,7 @@ def load_everything(snapshot):
         "snow_depth": load_snow_depth(snapshot),
         "snow_chance": load_snow_chance(),
         "reviews": load_reviews(snapshot),
+        "owner_answers": load_owner_answers(snapshot, include_live_answers),
     }
 
 
@@ -294,6 +295,45 @@ def load_reviews(snapshot):
                 "written_on": written_on,
             })
     return reviews
+
+
+def load_owner_answers(snapshot, include_live_answers):
+    """What owners answered to Connect's suggestions, so we don't ask them the same thing again.
+
+    Returns {"answered": {(business ID, date or "closed-for-good")}, "rejected": {(business ID, holiday): {hours}}}.
+
+    Two sources:
+    - The 2025 pilot, answered before the snapshot. Accepted and edited hours are already in the holiday
+      history, where the last-year clue uses them. A rejection leaves no trace there, so it's kept here.
+    - Answers given in the web app, only when include_live_answers is set: a back-test must not see
+      answers from after its snapshot.
+    """
+    answers = {"answered": set(), "rejected": defaultdict(set)}
+
+    rows = database().execute(
+        """SELECT entity_id, day_key, suggested_hours FROM pilot_decision
+           WHERE decision = 'REJECTED' AND decided_at < ?""",
+        (snapshot,),
+    )
+    for row in rows:
+        answers["rejected"][(row["entity_id"], row["day_key"])].add(row["suggested_hours"])
+
+    if include_live_answers:
+        rows = database().execute(
+            """SELECT answer.entity_id, answer.suggestion_key, answer.status, answer.snapshot, calendar.day_key
+               FROM suggestion_state answer
+               JOIN entity business ON business.id = answer.entity_id
+               LEFT JOIN calendar_special_day calendar
+                 ON calendar.country = business.country AND calendar.date = answer.suggestion_key
+               WHERE answer.status != 'pending'"""
+        )
+        for row in rows:
+            answers["answered"].add((row["entity_id"], row["suggestion_key"]))
+            suggested = json.loads(row["snapshot"])["suggested"]
+            if row["status"] == "declined" and row["day_key"] and suggested:
+                answers["rejected"][(row["entity_id"], row["day_key"])].add(suggested)
+
+    return answers
 
 
 @lru_cache(maxsize=1)

@@ -46,11 +46,19 @@ A change should improve **both** seasons. The organisers score hidden businesses
 
 For every question (one business on one day):
 
-1. If the business seems to have shut down for good while Google still shows it open, flag it for a person to check (`clues/closed_for_good.py`) and stop there.
-2. Ask every clue for a guess. A clue answers with hours, a confidence and a reason, or with nothing.
-3. `combine.py` adds up the clues: clues that suggest the same hours back each other up, and the hours with the highest combined confidence win.
-4. Work out what Google shows for that day (`hours.py`).
-5. If the winning hours differ from what Google shows, suggest them. Otherwise do nothing.
+1. If the business seems to have shut down for good while Google still shows it open, flag it for a person to check (`clues/closed_for_good.py`) and stop there. Not if the owner has already told us it's still open.
+2. Stay quiet if the owner has already answered a suggestion for this day, or has already entered hours for it: Google shows something other than their normal hours. The owner's own word always wins.
+3. Ask every clue for a guess. A clue answers with hours, a confidence and a reason, or with nothing. Guesses the owner already rejected for this holiday, in the 2025 pilot or in the web app, are dropped.
+4. `combine.py` adds up the clues: clues that suggest the same hours back each other up, and the hours with the highest combined confidence win.
+5. If the winning hours differ from what Google shows (`hours.py`), suggest them. Otherwise do nothing.
+
+### Learning from owners' answers
+
+`load_owner_answers` in `load.py` reads the 2025 pilot's answers and the answers given in the web app (`suggestion_state`). The back-test only sees pilot answers given before its snapshot.
+
+- **Accepted or edited:** the hours become the owner's own entry for that holiday, and next year the last-year clue suggests them. The pilot's are already in the holiday history (source `CONNECT_SUGGESTION`). In the pilot, edited hours matched what the owner really did 26 times out of 26.
+- **Rejected:** we never suggest those hours for that holiday again. In the pilot, the rejected hours were wrong all 28 times we can check. But only 11 of those owners kept what Google showed, so a rejection tells us what's wrong, not what's right.
+- **Already answered this season:** we don't ask again.
 
 ## Files
 
@@ -211,7 +219,8 @@ Add it to `clues/__init__.py` and to the list passed to `combine` in `run.py`. T
 | 7 Nov | `combine` instead of a fixed clue order | 64.55 | 61.20 |
 | 7 Nov | + type habits (no own history, ≥ 80% of the type closed) | 65.00 | 61.80 |
 | 7 Nov | + closed-for-good flag (catches 1 of the 2 dev businesses; the other has no review or edit to go on) | 65.22 | 61.80 |
-| 7 Nov | + Google edits, snow, seasonal breaks, less trust in skipped years, shops that follow their centre, and the reviews clue with every review read | **66.27** | **63.35** |
+| 7 Nov | + Google edits, snow, seasonal breaks, less trust in skipped years, shops that follow their centre, and the reviews clue with every review read | 66.27 | 63.35 |
+| 7 Nov | + owners' answers: quiet where the owner already entered or answered, never repeat a rejected suggestion | **66.69** | **63.36** |
 
 The rows before the last are without the reviews clue. A run takes about 10 seconds once the reviews are in `ai_cache.json`.
 
@@ -251,9 +260,8 @@ How high could it go? If we knew exactly what every business really did on the s
 Each idea starts from why it should work for real businesses, not from the dev scores. The dev answers were only used to check whether a data source can be trusted.
 
 1. **Owners who changed their normal hours and never updated the listing.** Customers notice and suggest new weekly hours. Where the listing really is outdated, those edits showed the real hours 31 times out of 45, and 17 of the 22 dev businesses with outdated hours have one. But on listings that are up to date, the edits are almost always wrong (1 right out of 478). So only act when there's a second sign: a review like "Aukioloajat ovat muuttuneet, netissä on vanhat tiedot" (89 reviews say this), or several edits agreeing. One fix covers every day the owner keeps normal hours, and it's a useful suggestion for the product on its own.
-2. **Don't repeat what the owner rejected** in the 2025 pilot. Only 7 dev rows, but it's how a real service should behave.
-3. **The days between Christmas and New Year.** The last-year clue uses the newest of those days for all of them. Matching by weekday, or by which of the days it is, should fit owners who close for part of the week.
-4. **Events and school holidays.** Few rows, but two demo stories need them: the bar next to the arena (FI-D0010) and the play centre in school holidays (FI-D0014).
+2. **The days between Christmas and New Year.** The last-year clue uses the newest of those days for all of them. Matching by weekday, or by which of the days it is, should fit owners who close for part of the week.
+3. **Events and school holidays.** Few rows, but two demo stories need them: the bar next to the arena (FI-D0010) and the play centre in school holidays (FI-D0014).
 
 ## AI ideas we haven't built yet
 
@@ -267,6 +275,8 @@ Each idea starts from why it should work for real businesses, not from the dev s
 
 ## Next steps
 
-1. Switch on the learned decider (AI idea 4) once runs are faster: predict all options of a day at once instead of one by one.
-2. Export the review readings with business IDs (`review_readings.csv`), so the website and the owner messages can quote them.
-3. The AI judge for when clues disagree (AI idea 2).
+1. Trust each clue as much as owners approve it: count approvals and declines per clue (pilot plus web app) and scale its confidence. Needs the clues behind each suggestion saved in `prediction` and in the web app's snapshot of the suggestion.
+2. Re-run the predictor for one business right after its owner answers, as a worker job, so the next suggestion reflects the answer within seconds.
+3. Offer standing permission to owners who approved the same holiday twice.
+4. Export the review readings with business IDs (`review_readings.csv`), so the website and the owner messages can quote them.
+5. The AI judge for when clues disagree (AI idea 2).
