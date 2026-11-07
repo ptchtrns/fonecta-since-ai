@@ -16,5 +16,8 @@
     },
   ],
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "hackathon-uploads" }],
-  // Secrets: BETTER_AUTH_SECRET, WORKER_TOKEN. Locally in .dev.vars, in production via `wrangler secret put`.
+  // Nightly run, 05:00 UTC (07:00 or 08:00 in Finland): reads linked pages, applies standing permissions, sends messages.
+  "triggers": { "crons": ["0 5 * * *"] },
+  // Secrets: BETTER_AUTH_SECRET, WORKER_TOKEN, optionally YEXT_API_KEY and the WHATSAPP_* ones. See .dev.vars.example.
+  // Locally in .dev.vars, in production via `wrangler secret put`. APP_URL is the public address used in owner links.
 }

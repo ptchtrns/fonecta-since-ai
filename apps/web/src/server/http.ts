@@ -37,6 +37,12 @@ export function currentUser(event: RequestEvent): SessionUser | null {
   return event.locals.user ?? null;
 }
 
+/** Base URL for links sent to owners. APP_URL is the public address (a tunnel locally) phones can open. */
+export function publicOrigin(request: Request): string {
+  const configured = (env as { APP_URL?: string }).APP_URL;
+  return (configured || new URL(request.url).origin).replace(/\/$/, '');
+}
+
 /** Checks the `Authorization: Bearer <WORKER_TOKEN>` header sent by apps/worker. */
 export function isWorkerRequest(request: Request): boolean {
   const expected = env.WORKER_TOKEN;

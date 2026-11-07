@@ -1,6 +1,8 @@
 import { Title } from '@solidjs/meta';
 import { revalidate, useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
+import { BusinessCombobox } from '~/components/connect/BusinessCombobox';
+import { ConnectLogo } from '~/components/connect/ConnectLogo';
 import { FormField } from '~/components/FormField';
 import { FormMessage } from '~/components/FormMessage';
 import { ApiError } from '~/lib/api';
@@ -14,7 +16,7 @@ type Mode = 'sign-in' | 'sign-up';
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [mode, setMode] = createSignal<Mode>('sign-in');
+  const [mode, setMode] = createSignal<Mode>(searchParams.mode === 'sign-up' ? 'sign-up' : 'sign-in');
   const form = createFormState();
 
   // Only same-site paths are allowed as redirect targets.
@@ -56,8 +58,8 @@ export default function Login() {
       <Title>{mode() === 'sign-in' ? 'Sign in' : 'Create account'}</Title>
       <div class="card card-border w-full max-w-md border-base-300 bg-base-100">
         <form class="card-body gap-4" onSubmit={onSubmit} novalidate>
-          <a href="/" class="link link-hover text-base-content/70">
-            Back to home
+          <a href="/" aria-label="Connecta AI home" class="self-start">
+            <ConnectLogo />
           </a>
           <h1 class="card-title text-2xl">{mode() === 'sign-in' ? 'Sign in' : 'Create an account'}</h1>
 
@@ -83,6 +85,7 @@ export default function Login() {
           <FormMessage message={form.message()} />
 
           <Show when={mode() === 'sign-up'}>
+            <BusinessCombobox error={form.fieldErrors().entityId} />
             <FormField label="Name" error={form.fieldErrors().name}>
               <input name="name" type="text" class="input w-full" autocomplete="name" />
             </FormField>

@@ -3,37 +3,38 @@
   themes: false;
 }
 
-/* Dark graphite theme: near-black page, charcoal cards, soft blue accent. */
+/* Ink: near-black text and buttons on white and warm paper grey. Colour is kept for status only,
+   and muted, so the owner's data is what stands out. */
 @plugin 'daisyui/theme' {
-  name: 'graphite';
+  name: 'ink';
   default: true;
-  prefersdark: true;
-  color-scheme: dark;
+  prefersdark: false;
+  color-scheme: light;
 
-  --color-base-100: #161618;
-  --color-base-200: #0c0c0d;
-  --color-base-300: #26262a;
-  --color-base-content: #ececee;
-  --color-primary: #6ea2ff;
-  --color-primary-content: #0c0c0d;
-  --color-secondary: #2f3a52;
-  --color-secondary-content: #d6e2ff;
-  --color-accent: #3ecf8e;
-  --color-accent-content: #0c0c0d;
-  --color-neutral: #2a2a2e;
-  --color-neutral-content: #ececee;
-  --color-info: #6ea2ff;
-  --color-info-content: #0c0c0d;
-  --color-success: #3ecf8e;
-  --color-success-content: #0c0c0d;
-  --color-warning: #e5a50a;
-  --color-warning-content: #0c0c0d;
-  --color-error: #f0506e;
-  --color-error-content: #0c0c0d;
+  --color-base-100: #ffffff;
+  --color-base-200: #f6f6f4;
+  --color-base-300: #e6e6e3;
+  --color-base-content: #1c1c1a;
+  --color-primary: #1c1c1a;
+  --color-primary-content: #ffffff;
+  --color-secondary: #efefec;
+  --color-secondary-content: #1c1c1a;
+  --color-accent: #1c1c1a;
+  --color-accent-content: #ffffff;
+  --color-neutral: #1c1c1a;
+  --color-neutral-content: #ffffff;
+  --color-info: #4a5560;
+  --color-info-content: #ffffff;
+  --color-success: #2f6b4f;
+  --color-success-content: #ffffff;
+  --color-warning: #8a6420;
+  --color-warning-content: #ffffff;
+  --color-error: #b42318;
+  --color-error-content: #ffffff;
 
-  --radius-selector: 1rem;
-  --radius-field: 0.5rem;
-  --radius-box: 1rem;
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -51,6 +52,214 @@
   --animate-bubble: bubble-in 6s ease-out infinite both;
   --animate-reveal: reveal-up 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-marquee: marquee 40s linear infinite;
+  --animate-step-bar: step-bar 9s linear infinite both;
+  --animate-step-dot: step-dot 9s linear infinite both;
+  --animate-step-card: step-card 9s linear infinite both;
+  --animate-scan: scan 3s ease-in-out infinite;
+  --animate-type: type 9s steps(29) infinite both;
+  --animate-caret: caret 1s step-end infinite;
+  --animate-pop: pop 9s ease-out infinite both;
+  --animate-stale: stale 8s ease-in-out infinite both;
+  --animate-fresh: fresh 8s ease-in-out infinite both;
+  --animate-row: row-in 6s ease-out infinite both;
+  --animate-fill: fill-bar 6s ease-out infinite both;
+  --animate-hero-msg: hero-msg 10s ease-out infinite both;
+  --animate-hero-reply: hero-reply 10s ease-out infinite both;
+  --animate-hero-done: hero-done 10s ease-out infinite both;
+  --animate-hero-waiting: hero-waiting 10s ease-out infinite both;
+
+  /* Hero: one 10s loop. The suggestion arrives on WhatsApp, the owner replies, it's published, and the
+     dashboard card flips from Waiting to Published at the same moment. */
+  @keyframes hero-msg {
+    0%,
+    4% {
+      opacity: 0;
+      translate: 0 8px;
+    }
+    10%,
+    92% {
+      opacity: 1;
+      translate: 0 0;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes hero-reply {
+    0%,
+    30% {
+      opacity: 0;
+      translate: 0 8px;
+    }
+    36%,
+    92% {
+      opacity: 1;
+      translate: 0 0;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes hero-done {
+    0%,
+    50% {
+      opacity: 0;
+      translate: 0 8px;
+    }
+    56%,
+    92% {
+      opacity: 1;
+      translate: 0 0;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes hero-waiting {
+    0%,
+    50% {
+      opacity: 1;
+    }
+    56%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* Channel sync: one channel is out of date, then turns green when Connecta AI re-syncs it. */
+  @keyframes stale {
+    0%,
+    45% {
+      opacity: 1;
+    }
+    55%,
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes fresh {
+    0%,
+    45% {
+      opacity: 0;
+      scale: 0.8;
+    }
+    55%,
+    92% {
+      opacity: 1;
+      scale: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  /* Suggestion card: evidence rows come in one by one, then the confidence bar fills. */
+  @keyframes row-in {
+    0%,
+    5% {
+      opacity: 0;
+      translate: -6px 0;
+    }
+    15%,
+    90% {
+      opacity: 1;
+      translate: 0 0;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes fill-bar {
+    0%,
+    40% {
+      scale: 0 1;
+    }
+    60%,
+    90% {
+      scale: 1 1;
+    }
+    100% {
+      scale: 1 1;
+      opacity: 0;
+    }
+  }
+
+  /* Each step is "active" for the first third of the loop. */
+  @keyframes step-bar {
+    0% {
+      scale: 0 1;
+      opacity: 1;
+    }
+    33% {
+      scale: 1 1;
+      opacity: 1;
+    }
+    40%,
+    100% {
+      scale: 1 1;
+      opacity: 0;
+    }
+  }
+  @keyframes step-dot {
+    0%,
+    33% {
+      background-color: var(--color-base-content);
+      color: var(--color-base-100);
+      border-color: var(--color-base-content);
+    }
+    38%,
+    100% {
+      background-color: var(--color-base-100);
+      color: var(--color-base-content);
+    }
+  }
+  @keyframes step-card {
+    0%,
+    33% {
+      border-color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+      translate: 0 -4px;
+    }
+    40%,
+    100% {
+      border-color: var(--color-base-300);
+      translate: 0 0;
+    }
+  }
+  @keyframes scan {
+    0% {
+      translate: -100% 0;
+    }
+    100% {
+      translate: 400% 0;
+    }
+  }
+  /* Types the suggestion while its step is active, then holds it. */
+  @keyframes type {
+    0% {
+      max-width: 0;
+    }
+    22%,
+    100% {
+      max-width: 29ch;
+    }
+  }
+  @keyframes caret {
+    50% {
+      opacity: 0;
+    }
+  }
+  /* The owner's reply, then "live everywhere", pop in during the approve step. */
+  @keyframes pop {
+    0%,
+    4% {
+      opacity: 0;
+      scale: 0.9;
+    }
+    10%,
+    100% {
+      opacity: 1;
+      scale: 1;
+    }
+  }
 
   @keyframes marquee {
     to {
@@ -148,5 +357,10 @@
   *::before,
   *::after {
     animation: none !important;
+  }
+  /* Without motion, show only the end state of the channel re-sync. */
+  .animate-stale,
+  .animate-hero-waiting {
+    display: none;
   }
 }

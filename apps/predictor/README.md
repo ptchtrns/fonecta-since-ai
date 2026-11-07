@@ -21,7 +21,7 @@ python3 apps/predictor/run.py --save local    # also show the 2026 predictions o
 python3 apps/predictor/run.py --save remote   # the same for the deployed site, demo businesses only
 ```
 
-`--save` replaces the `prediction` table, which `/dashboard/suggestions` shows. Run `pnpm db:migrate:remote` in `apps/web` before the first `--save remote`. Reseeding empties the table, so save again afterwards.
+`--save` replaces the `prediction` table, which the dashboard's Home page shows. Run `pnpm db:migrate:remote` in `apps/web` before the first `--save remote`. Reseeding empties the table, so save again afterwards.
 
 The questions and all the data come from the database. `evaluate.py` is the organisers' scorer and still reads the labels from `labels/*.csv`. To read another database file, set `PREDICTOR_DB`.
 

@@ -9,7 +9,7 @@ export default function Document(props: ParentProps) {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <title>Hackathon Template</title>
+        <title>Connecta AI</title>
         <HydrationScript />
       </head>
       <body class="min-h-screen bg-base-200 text-base-content">{props.children}</body>
