@@ -7,6 +7,7 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
 const timestamps = {
@@ -133,7 +134,8 @@ export const languages = ['fi', 'sv', 'nb', 'en'] as const;
 export type Language = (typeof languages)[number];
 /** How pressing a suggestion is. See `importanceLabel`. */
 export const importances = ['low', 'medium', 'high'] as const;
-export const contactChannels = ['EMAIL', 'SMS', 'WHATSAPP', 'APP_PUSH'] as const;
+// The customer record's channels, plus TELEGRAM, which is never in the record: the owner connects it here.
+export const contactChannels = ['EMAIL', 'SMS', 'WHATSAPP', 'APP_PUSH', 'TELEGRAM'] as const;
 export type ContactChannel = (typeof contactChannels)[number];
 // `yext`: a business from the team's Yext account rather than the dataset, added when someone takes it on. Not in
 // any dataset file, so a reseed removes it and the app adds it again from Yext.
@@ -342,6 +344,8 @@ export const entity = sqliteTable(
   ],
 );
 
+// The owner's contact preferences: from the dataset, or created when an account takes on a business without one.
+// The owner changes them on the Integrations page: opt-out, preferred channel, language and standing permission.
 export const customerContact = sqliteTable('customer_contact', {
   entityId: text('entity_id')
     .primaryKey()
@@ -352,7 +356,9 @@ export const customerContact = sqliteTable('customer_contact', {
   email: text('email').notNull(),
   mobile: text('mobile').notNull(),
   bestContactWindow: text('best_contact_window').notNull(),
+  // "Handle public holidays from now on without asking."
   standingPermissionHolidays: integer('standing_permission_holidays', { mode: 'boolean' }).notNull(),
+  // No suggestion messages at all.
   optedOutOfSuggestions: integer('opted_out_of_suggestions', { mode: 'boolean' }).notNull(),
 });
 
@@ -571,26 +577,34 @@ export type BusinessEdits = Partial<{
   hours: WeekHours;
 }>;
 
-export const businessProfile = sqliteTable('business_profile', {
-  entityId: text('entity_id').primaryKey(),
-  // The owner's changes on top of the entity's own values.
-  edits: text('edits', { mode: 'json' }).$type<BusinessEdits>().notNull(),
-  whatsappPhone: text('whatsapp_phone'),
-  whatsappLanguage: text('whatsapp_language', { enum: languages }).notNull().default('en'),
-  whatsappOn: integer('whatsapp_on', { mode: 'boolean' }).notNull().default(false),
-  // The least important suggestion that goes out on WhatsApp. Lower ones wait on the dashboard.
-  whatsappMinImportance: text('whatsapp_min_importance', { enum: importances }).notNull().default('low'),
-  // "Handle public holidays from now on without asking."
-  standingPermission: integer('standing_permission', { mode: 'boolean' }).notNull().default(false),
-  // WhatsApp only allows free-form messages within 24 hours of the owner's last message.
-  lastInboundAt: integer('last_inbound_at', { mode: 'timestamp_ms' }),
-  // No messages at all. Starts from the customer record's opt-out; the owner can change it.
-  optedOut: integer('opted_out', { mode: 'boolean' }).notNull().default(false),
-  ...timestamps,
-});
+export const businessProfile = sqliteTable(
+  'business_profile',
+  {
+    entityId: text('entity_id').primaryKey(),
+    // The owner's changes on top of the entity's own values.
+    edits: text('edits', { mode: 'json' }).$type<BusinessEdits>().notNull(),
+    whatsappPhone: text('whatsapp_phone'),
+    whatsappOn: integer('whatsapp_on', { mode: 'boolean' }).notNull().default(false),
+    // The least important suggestion that goes out on WhatsApp. Lower ones wait on the dashboard.
+    whatsappMinImportance: text('whatsapp_min_importance', { enum: importances }).notNull().default('low'),
+    // WhatsApp only allows free-form messages within 24 hours of the owner's last message.
+    lastInboundAt: integer('last_inbound_at', { mode: 'timestamp_ms' }),
+    // Email through Resend, to an address the owner chose here.
+    emailAddress: text('email_address'),
+    emailOn: integer('email_on', { mode: 'boolean' }).notNull().default(false),
+    // Telegram: the chat the owner started with the bot. The link token is in the "Connect Telegram" link and is
+    // swapped for the chat id when the owner presses Start.
+    telegramChatId: text('telegram_chat_id'),
+    telegramName: text('telegram_name'),
+    telegramLinkToken: text('telegram_link_token'),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('business_profile_telegram_link_idx').on(t.telegramLinkToken)],
+);
 
-// Messages for channels this app can't send yet (text message, email, app notification): recorded here and shown
-// to the owner, so the demo respects each owner's preferred channel.
+// Messages for channels this app can't send on (text message, app notification, a preferred channel the owner hasn't
+// connected, and email to the customer record's address): recorded here and shown to the owner, so the demo respects
+// each owner's preferred channel.
 export const outbox = sqliteTable(
   'outbox',
   {
@@ -606,7 +620,7 @@ export const outbox = sqliteTable(
 
 export const suggestionStatuses = ['pending', 'approved', 'edited', 'declined'] as const;
 export type SuggestionStatus = (typeof suggestionStatuses)[number];
-export const decisionChannels = ['dashboard', 'link', 'whatsapp', 'standing'] as const;
+export const decisionChannels = ['dashboard', 'link', 'whatsapp', 'telegram', 'standing'] as const;
 export type DecisionChannel = (typeof decisionChannels)[number];
 
 /** What was suggested and why, kept with the decision: predictor runs replace the `prediction` rows. */

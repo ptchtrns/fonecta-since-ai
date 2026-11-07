@@ -1,7 +1,8 @@
 import { publishedSummary } from '~/lib/messages';
 import { decideSchema, tokenSchema } from '~/schemas/business.schema';
-import { json, notFound, readJson, validationFailed, type ApiEvent } from '~/server/http';
-import { liveSites } from '~/services/business.service';
+import { json, notFound, publicOrigin, readJson, validationFailed, type ApiEvent } from '~/server/http';
+import { getBusiness, liveSites } from '~/services/business.service';
+import { sendNext } from '~/services/contact.service';
 import { decide, findByToken, listSuggestions } from '~/services/suggestions.service';
 
 // Public: the owner opens the link from their message. The unguessable token is the only credential, and it only
@@ -59,5 +60,8 @@ export async function POST(event: ApiEvent) {
         return notFound('This suggestion is no longer open');
     }
   }
+  // Answered from the link in a message: the next suggestion can go out, as after a button tap.
+  const business = await getBusiness(found.state.entityId);
+  if (business) await sendNext(business, publicOrigin(event.request));
   return json({ message: publishedSummary(result.decision.sites), data: result.decision });
 }

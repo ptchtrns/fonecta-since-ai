@@ -23,5 +23,7 @@ export async function PATCH(event: ApiEvent) {
   if (error?.reason === 'NotFound') return notFound();
   if (validation.data.optedOut) return json({ message: "Saved. We won't send you suggestion messages." });
   if (result?.sent) return json({ message: 'Saved. Your most important suggestion is on its way.' });
-  return json({ message: 'Saved. Suggestions will reach you again within your contact hours.' });
+  if (validation.data.optedOut === false)
+    return json({ message: 'Saved. Suggestions will reach you again within your contact hours.' });
+  return json({ message: 'Saved.' });
 }

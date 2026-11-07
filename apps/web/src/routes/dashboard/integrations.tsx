@@ -1,90 +1,32 @@
 import { Title } from '@solidjs/meta';
-import { revalidate, useBeforeLeave, type RouteDefinition } from '@solidjs/router';
-import { createMemo, createSignal, For, onSettled, Show } from 'solid-js';
-import { FormField } from '~/components/FormField';
-import { FormMessage } from '~/components/FormMessage';
+import { useBeforeLeave, type RouteDefinition } from '@solidjs/router';
+import { createMemo, onSettled } from 'solid-js';
 import { ContactPreferences } from '~/components/connect/ContactPreferences';
-import { Page, PageHeader, Panel } from '~/components/connect/Page';
-import { BrandMark } from '~/components/connect/PublisherLogo';
-import { WhatsAppPreview } from '~/components/connect/WhatsAppPreview';
-import type { Language } from '~/db/schema';
-import { meetsImportance, type Importance } from '~/lib/importance';
-import { apiSend } from '~/lib/api';
-import { createFormState } from '~/lib/form';
+import { Page, PageHeader } from '~/components/connect/Page';
+import { AddressChannel } from '~/components/integrations/AddressChannel';
+import { TelegramChannel } from '~/components/integrations/TelegramChannel';
+import { getCurrentUser } from '~/queries/session';
 import { getWorkspace, type Workspace } from '~/queries/workspace';
-import { whatsappSchema } from '~/schemas/business.schema';
+import { emailSchema, whatsappSchema } from '~/schemas/business.schema';
 
 export const route = {
   preload: () => void getWorkspace(),
 } satisfies RouteDefinition;
 
-const languageNames: Record<Language, string> = { fi: 'Suomi', sv: 'Svenska', nb: 'Norsk', en: 'English' };
-
-const levels: { value: Importance; title: string; text: string }[] = [
-  {
-    value: 'high',
-    title: 'High only',
-    text: 'The most pressing: likely right, on a day many people look you up, often within the next week.',
-  },
-  {
-    value: 'medium',
-    title: 'Medium and up',
-    text: 'Also changes worth a look that matter less: a less certain guess or a quieter day.',
-  },
-  {
-    value: 'low',
-    title: 'Everything',
-    text: 'Low ones too: unsure guesses, days few people look you up, days far ahead.',
-  },
-];
-
-/** The settings as the form holds them. Phones are compared without spaces, as the server stores them. */
-function readForm(el: HTMLFormElement) {
-  const data = new FormData(el);
-  return {
-    phone: String(data.get('phone') ?? '').replace(/\s+/g, ''),
-    language: data.get('language'),
-    on: data.get('on') === 'on',
-    minImportance: data.get('minImportance'),
-    standingPermission: data.get('standingPermission') === 'on',
-  };
-}
-type FormValues = ReturnType<typeof readForm>;
-const optionKeys = ['language', 'on', 'minImportance', 'standingPermission'] as const;
-
 export default function Integrations() {
   const workspace = createMemo(() => getWorkspace() as Promise<Workspace>);
-  const whatsapp = () => workspace().whatsapp;
-  // The owner's pick before saving; until then, what's saved.
-  const [picked, setPicked] = createSignal<Importance | null>(null);
-  const level = () => picked() ?? whatsapp().minImportance;
-  // The header toggle: the settings below only show while it's on.
-  const [enabled, setEnabled] = createSignal(() => whatsapp().on);
-  let phoneInput!: HTMLInputElement;
-  // What WhatsApp could carry: hours changes no linked page disputes. The rest always wait on the dashboard.
-  const waiting = () =>
-    workspace().suggestions.pending.filter((p) => p.kind === 'hours' && p.checks.every((c) => c.agrees));
-  const sentAt = (min: Importance) => waiting().filter((p) => meetsImportance(p.importance, min)).length;
-  const form = createFormState();
-  const test = createFormState();
+  const user = createMemo(() => getCurrentUser());
 
-  // What the form holds after the owner's last edit; null until they touch it. Unsaved changes are
-  // the fields that differ from what's saved, so saving (or undoing an edit) clears them by itself.
-  const [edited, setEdited] = createSignal<FormValues | null>(null);
-  const changed = (key: keyof FormValues) => {
-    const values = edited();
-    return values !== null && values[key] !== whatsapp()[key];
-  };
-  const optionsChanged = () => optionKeys.filter((key) => key !== 'on').some(changed);
-  // The preview follows the language being picked; which suggestion it is still follows the saved level.
-  const previewLanguage = () => (edited()?.language as Language | undefined) ?? whatsapp().language;
-  const unsaved = () => changed('phone') || changed('on') || optionsChanged();
+  // Each form reports whether it has unsaved changes, so leaving the page can warn about any of them.
+  const forms: (() => boolean)[] = [];
+  const register = (unsaved: () => boolean) => void forms.push(unsaved);
+  const unsaved = () => forms.some((f) => f());
 
   useBeforeLeave((event) => {
     if (!unsaved() || event.defaultPrevented) return;
     event.preventDefault();
     setTimeout(() => {
-      if (window.confirm('Leave without saving your WhatsApp settings?')) event.retry(true);
+      if (window.confirm('Leave without saving your settings?')) event.retry(true);
     }, 100);
   });
   onSettled(() => {
@@ -95,254 +37,68 @@ export default function Integrations() {
     return () => window.removeEventListener('beforeunload', warn);
   });
 
-  function onSubmit(event: SubmitEvent) {
-    event.preventDefault();
-    const payload = form.validate(whatsappSchema, readForm(event.currentTarget as HTMLFormElement));
-    if (!payload) return;
-    return form.submit(
-      async () => (await apiSend('/api/workspace/whatsapp', 'PATCH', payload)).message,
-      () => revalidate(getWorkspace.key),
-    );
-  }
-
-  function onToggle(on: boolean) {
-    setEnabled(on);
-    if (on && !phoneInput.value) queueMicrotask(() => phoneInput.focus());
-  }
-
-  function sendTest() {
-    return test.submit(async () => (await apiSend('/api/workspace/whatsapp/test', 'POST', {})).message);
-  }
-
   return (
     <Page class="max-w-3xl">
       <Title>Integrations · Connecta AI</Title>
       <PageHeader title="Integrations" />
 
-      <ContactPreferences contact={workspace().contact} />
+      <ContactPreferences workspace={workspace()} register={register} />
 
-      <Panel>
-        <form
-          class="flex flex-col gap-4"
-          onSubmit={onSubmit}
-          onInput={(event) => setEdited(readForm(event.currentTarget))}
-          novalidate
-        >
-          <div class="flex items-center gap-3">
-            <BrandMark name="WhatsApp" class="size-8" />
-            <div class="min-w-0 flex-1">
-              <h2 class="font-semibold">WhatsApp</h2>
-              <p class="text-sm text-base-content/60">Answer suggestions with one tap, without logging in.</p>
-            </div>
-            <input
-              name="on"
-              type="checkbox"
-              class="toggle"
-              aria-label="Use WhatsApp"
-              checked={enabled()}
-              onChange={(e) => onToggle(e.currentTarget.checked)}
-            />
-          </div>
-          <FormMessage message={form.message()} />
+      <AddressChannel
+        name="WhatsApp"
+        text="Answer suggestions with one tap, without logging in."
+        field="phone"
+        label="WhatsApp number"
+        type="tel"
+        placeholder="+358 40 123 4567"
+        autocomplete="tel"
+        saved={{
+          address: workspace().whatsapp.phone,
+          on: workspace().whatsapp.on,
+          configured: workspace().whatsapp.configured,
+        }}
+        notConfigured={
+          <>
+            WhatsApp sending is off because the <code class="font-mono">WHATSAPP_TOKEN</code> and{' '}
+            <code class="font-mono">WHATSAPP_PHONE_NUMBER_ID</code> environment variables aren't set. Your
+            settings still save, and messages start once both are set.
+          </>
+        }
+        endpoint="/api/workspace/whatsapp"
+        testEndpoint="/api/workspace/whatsapp/test"
+        schema={whatsappSchema}
+        normalize={(value) => value.replace(/\s+/g, '')}
+        register={register}
+      />
 
-          <Show when={!enabled() && whatsapp().on}>
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-box border border-base-300 bg-base-200 px-4 py-3 text-sm">
-              <span>Save to stop sending suggestions to WhatsApp.</span>
-              <button type="submit" class="btn btn-sm btn-primary" disabled={form.pending()}>
-                <Show when={form.pending()}>
-                  <span class="loading loading-spinner loading-sm" />
-                </Show>
-                Save
-              </button>
-            </div>
-          </Show>
+      <TelegramChannel telegram={workspace().telegram} />
 
-          {/* Hidden rather than removed while off, so the form keeps what was typed and still sends it. */}
-          <div class="flex flex-col gap-4" hidden={!enabled()}>
-            <Show when={!whatsapp().configured}>
-              <p class="rounded-box border border-base-300 bg-base-200 px-4 py-3 text-sm">
-                WhatsApp sending is off because the <code class="font-mono">WHATSAPP_TOKEN</code> and{' '}
-                <code class="font-mono">WHATSAPP_PHONE_NUMBER_ID</code> environment variables aren't set. Your
-                settings still save, and messages start once both are set.
-              </p>
-            </Show>
-
-            <div class="flex flex-col gap-1.5">
-              <label for="whatsapp-phone" class="font-medium">
-                WhatsApp number
-              </label>
-              <div class="flex gap-2">
-                <input
-                  ref={phoneInput}
-                  id="whatsapp-phone"
-                  name="phone"
-                  type="tel"
-                  class="input min-w-0 flex-1"
-                  placeholder="+358 40 123 4567"
-                  defaultValue={whatsapp().phone}
-                  autocomplete="tel"
-                />
-                <button type="submit" class="btn btn-primary" disabled={form.pending()}>
-                  <Show when={form.pending()}>
-                    <span class="loading loading-spinner loading-sm" />
-                  </Show>
-                  Save
-                </button>
-              </div>
-              <Show
-                when={form.fieldErrors().phone}
-                fallback={
-                  <Show when={unsaved()}>
-                    <span class="text-sm text-base-content/60">You have unsaved changes.</span>
-                  </Show>
-                }
-              >
-                {(error) => <span class="text-error">{error()}</span>}
-              </Show>
-            </div>
-
-            <details class="collapse-arrow collapse rounded-box border border-base-300">
-              <summary class="collapse-title flex min-h-0 items-center gap-2 py-3 text-sm font-medium">
-                More options
-                <Show when={optionsChanged()}>
-                  <span class="badge badge-soft badge-warning badge-sm">Unsaved</span>
-                </Show>
-              </summary>
-              <div class="collapse-content flex flex-col gap-4">
-                <FormField label="Message language">
-                  <select name="language" class="select w-full sm:w-1/2">
-                    <For each={Object.keys(languageNames) as Language[]}>
-                      {(language) => (
-                        <option value={language} selected={whatsapp().language === language}>
-                          {languageNames[language]}
-                        </option>
-                      )}
-                    </For>
-                  </select>
-                </FormField>
-
-                <fieldset class="flex flex-col gap-2">
-                  <legend class="font-medium">Which suggestions to send</legend>
-                  <p class="text-sm text-base-content/60">
-                    Every suggestion has a level. The rest wait for you on the dashboard.
-                  </p>
-                  <div class="grid gap-2 sm:grid-cols-3">
-                    <For each={levels}>
-                      {(option) => (
-                        <label
-                          class={[
-                            'flex cursor-pointer flex-col gap-1 rounded-box border p-3',
-                            level() === option.value ? 'border-base-content' : 'border-base-300',
-                          ]}
-                        >
-                          <span class="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="minImportance"
-                              value={option.value}
-                              class="radio radio-sm"
-                              checked={level() === option.value}
-                              onChange={() => setPicked(option.value)}
-                            />
-                            <span class="font-medium">{option.title}</span>
-                          </span>
-                          <span class="text-sm text-base-content/60">{option.text}</span>
-                          <span class="mt-auto pt-1 text-xs text-base-content/50">
-                            {sentAt(option.value)} of {waiting().length} waiting now
-                          </span>
-                        </label>
-                      )}
-                    </For>
-                  </div>
-                  <details class="text-sm text-base-content/70">
-                    <summary class="cursor-pointer text-xs text-base-content/50 select-none">
-                      How levels work
-                    </summary>
-                    <div class="mt-2 flex flex-col gap-2">
-                      <p>
-                        A suggestion matters more the likelier it is to be right, the more people look you up
-                        on Google that day, and the sooner the day is. Days within a week count double, within
-                        a month a quarter more.
-                      </p>
-                      <p>
-                        Levels compare your suggestions with each other. Your most pressing upcoming day is
-                        High, and so is anything at least two thirds as pressing. Medium is at least a third,
-                        Low is the rest. So a suggestion can move up as its day gets close.
-                      </p>
-                      <p>
-                        Days a page you linked disagrees with, and the question whether you've closed for
-                        good, are never sent: they wait on the dashboard.
-                      </p>
-                    </div>
-                  </details>
-                </fieldset>
-
-                <label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
-                  <input
-                    name="standingPermission"
-                    type="checkbox"
-                    class="toggle mt-0.5"
-                    checked={whatsapp().standingPermission}
-                  />
-                  <span>
-                    <span class="block font-medium">Handle public holidays without asking</span>
-                    <span class="text-sm text-base-content/60">
-                      We update them when we're at least 70% sure and no linked page disagrees, then tell you
-                      what changed.
-                    </span>
-                  </span>
-                </label>
-
-                <Show when={whatsapp().preview}>
-                  {(preview) => (
-                    <div class="flex flex-col gap-2">
-                      <div class="flex flex-wrap items-center justify-between gap-2">
-                        <h3 class="font-medium">Your next message</h3>
-                        <a
-                          href={preview().url}
-                          target="_blank"
-                          rel="noreferrer"
-                          class="btn btn-ghost btn-sm border-base-300"
-                        >
-                          Open the answer page
-                        </a>
-                      </div>
-                      <Show when={changed('minImportance')}>
-                        <p class="text-sm text-base-content/60">
-                          This is the next message at your saved level. Save to see it at the new one.
-                        </p>
-                      </Show>
-                      <WhatsAppPreview
-                        body={preview().messages[previewLanguage()].body}
-                        buttons={preview().messages[previewLanguage()].buttons}
-                      />
-                    </div>
-                  )}
-                </Show>
-
-                <Show when={whatsapp().configured && whatsapp().phone}>
-                  <FormMessage message={test.message()} />
-                  <div class="flex flex-wrap items-center justify-end gap-2">
-                    <Show when={unsaved()}>
-                      <span class="text-sm text-base-content/60">
-                        Save first: the test uses your saved settings.
-                      </span>
-                    </Show>
-                    <button
-                      type="button"
-                      class="btn btn-ghost"
-                      disabled={test.pending() || unsaved()}
-                      onClick={sendTest}
-                    >
-                      Send test message
-                    </button>
-                  </div>
-                </Show>
-              </div>
-            </details>
-          </div>
-        </form>
-      </Panel>
+      <AddressChannel
+        name="Email"
+        text="Each suggestion with a link to answer it, without logging in."
+        field="address"
+        label="Email address"
+        type="email"
+        placeholder="owner@example.com"
+        autocomplete="email"
+        saved={{
+          address: workspace().email.address,
+          on: workspace().email.on,
+          configured: workspace().email.configured,
+        }}
+        suggested={user()?.email}
+        notConfigured={
+          <>
+            Email sending is off because the <code class="font-mono">RESEND_API_KEY</code> and{' '}
+            <code class="font-mono">RESEND_FROM</code> environment variables aren't set. Your settings still
+            save, and emails start once both are set.
+          </>
+        }
+        endpoint="/api/workspace/email"
+        testEndpoint="/api/workspace/email/test"
+        schema={emailSchema}
+        register={register}
+      />
     </Page>
   );
 }

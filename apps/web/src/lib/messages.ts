@@ -24,11 +24,18 @@ type ReasonCopy = {
 type Copy = {
   hi: (name: string) => string;
   closed: string;
-  headline: (name: string, day: string) => string;
-  googleShows: (hours: string) => string;
-  weSuggest: (hours: string) => string;
+  /** The question the buttons answer: open these hours, or closed. */
+  askOpen: (hours: string) => string;
+  askClosed: string;
+  googleNow: (hours: string) => string;
   impact: (people: number) => string;
+  /** The answer page, at the end of a suggestion: the way to answer where there are no buttons. */
+  link: (url: string) => string;
+  /** The reply to the button for other hours. */
   edit: (url: string) => string;
+  /** Email subjects: the question in a few words. */
+  subjectOpen: (day: string, hours: string) => string;
+  subjectClosed: (day: string) => string;
   /** Reply buttons, at most 20 characters each. */
   buttons: { confirmClosed: string; confirmHours: string; editOpen: string; edit: string; dismiss: string };
   done: (hours: string) => string;
@@ -39,6 +46,16 @@ type Copy = {
   answered: string;
   useButtons: string;
   standing: (business: string, days: string) => string;
+  /** Email subject for a standing-permission update. */
+  standingSubject: (business: string) => string;
+  /** The email button that opens the answer page. */
+  answer: string;
+  /** Telegram, once the owner has pressed Start. */
+  connected: (business: string) => string;
+  /** A Telegram start link that's no longer valid. */
+  linkExpired: string;
+  /** The Integrations page's test message, on email and Telegram. */
+  test: (business: string) => string;
   schoolBreak: string;
   weekdays: string[];
   reasons: ReasonCopy;
@@ -48,18 +65,20 @@ const copy: Record<Language, Copy> = {
   fi: {
     hi: (name) => `Hei ${name}!`,
     closed: 'suljettu',
-    headline: (name, day) => `*Vahvista aukioloaikasi: ${name} ${day}*`,
-    googleShows: (hours) => `Google näyttää nyt ${hours}.`,
-    weSuggest: (hours) => `Ehdotamme: *${hours}*.`,
-    impact: (people) =>
-      `Noin ${people} ihmisen odotetaan etsivän sinua sinä päivänä. Oikeat ajat säästävät heidät turhalta matkalta.`,
-    edit: (url) => `Muokkaa tai katso perustelut: ${url}`,
+    askOpen: (hours) => `Oletteko auki *${hours}*?`,
+    askClosed: 'Oletteko *kiinni* sinä päivänä?',
+    googleNow: (hours) => `Google nyt: ${hours}`,
+    impact: (people) => `Noin ${people} ihmistä etsii sinua sinä päivänä.`,
+    link: (url) => `Vastaa tai katso lisää: ${url}`,
+    edit: (url) => `Kerro oikeat ajat täällä: ${url}`,
+    subjectOpen: (day, hours) => `${day}: auki ${hours}?`,
+    subjectClosed: (day) => `${day}: kiinni?`,
     buttons: {
-      confirmClosed: 'Vahvista suljettu',
-      confirmHours: 'Vahvista ajat',
-      editOpen: 'Auki – muokkaa ajat',
-      edit: 'Muokkaa aikoja',
-      dismiss: 'Ohita',
+      confirmClosed: 'Kyllä, kiinni',
+      confirmHours: 'Kyllä, oikein',
+      editOpen: 'Ei, olemme auki',
+      edit: 'Muut ajat',
+      dismiss: 'Pidä ennallaan',
     },
     done: (hours) => `Valmista! ${hours} on päivitetty.`,
     liveNow: (sites) => `Näkyy nyt: ${sites}.`,
@@ -70,6 +89,12 @@ const copy: Record<Language, Copy> = {
     useButtons: 'Vastaa napeilla tai avaa viestin linkki.',
     standing: (business, days) =>
       `Sopimuksemme mukaisesti päivitimme yrityksen ${business} aukioloajat: ${days}.`,
+    standingSubject: (business) => `Päivitimme yrityksen ${business} aukioloajat`,
+    answer: 'Vastaa',
+    connected: (business) =>
+      `Valmista! Lähetämme ehdotukset yrityksen ${business} aukioloajoista tänne, yksi kerrallaan.`,
+    linkExpired: 'Tämä linkki ei ole enää voimassa. Avaa uusi linkki Integraatiot-sivulta.',
+    test: (business) => `Testiviesti: yrityksen ${business} ehdotukset tulevat tänne.`,
     schoolBreak: 'Koululoma',
     weekdays: ['ma', 'ti', 'ke', 'to', 'pe', 'la', 'su'],
     reasons: {
@@ -95,18 +120,20 @@ const copy: Record<Language, Copy> = {
   sv: {
     hi: (name) => `Hej ${name}!`,
     closed: 'stängt',
-    headline: (name, day) => `*Bekräfta era öppettider: ${name} ${day}*`,
-    googleShows: (hours) => `Google visar nu ${hours}.`,
-    weSuggest: (hours) => `Vi föreslår: *${hours}*.`,
-    impact: (people) =>
-      `Omkring ${people} personer väntas söka efter er den dagen. Rätt tider sparar dem en onödig resa.`,
-    edit: (url) => `Ändra eller se varför: ${url}`,
+    askOpen: (hours) => `Har ni öppet *${hours}*?`,
+    askClosed: 'Har ni *stängt* den dagen?',
+    googleNow: (hours) => `Google nu: ${hours}`,
+    impact: (people) => `Omkring ${people} personer söker efter er den dagen.`,
+    link: (url) => `Svara eller se mer: ${url}`,
+    edit: (url) => `Ange rätt tider här: ${url}`,
+    subjectOpen: (day, hours) => `${day}: öppet ${hours}?`,
+    subjectClosed: (day) => `${day}: stängt?`,
     buttons: {
-      confirmClosed: 'Bekräfta stängt',
-      confirmHours: 'Bekräfta tiderna',
-      editOpen: 'Öppet – ändra tider',
-      edit: 'Ändra tider',
-      dismiss: 'Hoppa över',
+      confirmClosed: 'Ja, stängt',
+      confirmHours: 'Ja, det stämmer',
+      editOpen: 'Nej, vi har öppet',
+      edit: 'Andra tider',
+      dismiss: 'Behåll som det är',
     },
     done: (hours) => `Klart! ${hours} är uppdaterat.`,
     liveNow: (sites) => `Syns nu på ${sites}.`,
@@ -116,6 +143,11 @@ const copy: Record<Language, Copy> = {
     answered: 'Det här är redan besvarat, tack!',
     useButtons: 'Svara med knapparna eller öppna länken i meddelandet.',
     standing: (business, days) => `Som avtalat har vi uppdaterat öppettiderna för ${business}: ${days}.`,
+    standingSubject: (business) => `Vi har uppdaterat öppettiderna för ${business}`,
+    answer: 'Svara',
+    connected: (business) => `Klart! Vi skickar förslag om öppettiderna för ${business} hit, ett i taget.`,
+    linkExpired: 'Den här länken gäller inte längre. Öppna en ny från sidan Integrationer.',
+    test: (business) => `Testmeddelande: förslag för ${business} kommer hit.`,
     schoolBreak: 'Skollov',
     weekdays: ['mån', 'tis', 'ons', 'tors', 'fre', 'lör', 'sön'],
     reasons: {
@@ -139,18 +171,20 @@ const copy: Record<Language, Copy> = {
   nb: {
     hi: (name) => `Hei ${name}!`,
     closed: 'stengt',
-    headline: (name, day) => `*Bekreft åpningstidene deres: ${name} ${day}*`,
-    googleShows: (hours) => `Google viser nå ${hours}.`,
-    weSuggest: (hours) => `Vi foreslår: *${hours}*.`,
-    impact: (people) =>
-      `Rundt ${people} personer ventes å søke etter dere den dagen. Riktige tider sparer dem en unødvendig tur.`,
-    edit: (url) => `Endre eller se hvorfor: ${url}`,
+    askOpen: (hours) => `Har dere åpent *${hours}*?`,
+    askClosed: 'Har dere *stengt* den dagen?',
+    googleNow: (hours) => `Google nå: ${hours}`,
+    impact: (people) => `Rundt ${people} personer søker etter dere den dagen.`,
+    link: (url) => `Svar eller se mer: ${url}`,
+    edit: (url) => `Legg inn riktige tider her: ${url}`,
+    subjectOpen: (day, hours) => `${day}: åpent ${hours}?`,
+    subjectClosed: (day) => `${day}: stengt?`,
     buttons: {
-      confirmClosed: 'Bekreft stengt',
-      confirmHours: 'Bekreft tidene',
-      editOpen: 'Åpent – endre tider',
-      edit: 'Endre tider',
-      dismiss: 'Hopp over',
+      confirmClosed: 'Ja, stengt',
+      confirmHours: 'Ja, det stemmer',
+      editOpen: 'Nei, vi har åpent',
+      edit: 'Andre tider',
+      dismiss: 'Behold som det er',
     },
     done: (hours) => `Ferdig! ${hours} er oppdatert.`,
     liveNow: (sites) => `Vises nå på ${sites}.`,
@@ -160,6 +194,11 @@ const copy: Record<Language, Copy> = {
     answered: 'Dette er allerede besvart, takk!',
     useButtons: 'Svar med knappene eller åpne lenken i meldingen.',
     standing: (business, days) => `Som avtalt har vi oppdatert åpningstidene for ${business}: ${days}.`,
+    standingSubject: (business) => `Vi har oppdatert åpningstidene for ${business}`,
+    answer: 'Svar nå',
+    connected: (business) => `Ferdig! Vi sender forslag om åpningstidene for ${business} hit, ett om gangen.`,
+    linkExpired: 'Denne lenken gjelder ikke lenger. Åpne en ny fra siden Integrasjoner.',
+    test: (business) => `Testmelding: forslag for ${business} kommer hit.`,
     schoolBreak: 'Skoleferie',
     weekdays: ['man', 'tir', 'ons', 'tor', 'fre', 'lør', 'søn'],
     reasons: {
@@ -184,18 +223,20 @@ const copy: Record<Language, Copy> = {
   en: {
     hi: (name) => `Hi ${name}!`,
     closed: 'closed',
-    headline: (name, day) => `*Confirm your ${name} hours (${day})*`,
-    googleShows: (hours) => `Google now shows ${hours}.`,
-    weSuggest: (hours) => `We suggest: *${hours}*.`,
-    impact: (people) =>
-      `About ${people} people are expected to look you up that day. Keep your hours right so nobody makes a wasted trip.`,
-    edit: (url) => `Edit or see why: ${url}`,
+    askOpen: (hours) => `Are you open *${hours}*?`,
+    askClosed: 'Are you *closed* that day?',
+    googleNow: (hours) => `Google now: ${hours}`,
+    impact: (people) => `About ${people} people will look you up that day.`,
+    link: (url) => `Answer or see more: ${url}`,
+    edit: (url) => `Enter the right hours here: ${url}`,
+    subjectOpen: (day, hours) => `${day}: open ${hours}?`,
+    subjectClosed: (day) => `${day}: closed?`,
     buttons: {
-      confirmClosed: 'Confirm closed',
-      confirmHours: 'Confirm hours',
-      editOpen: "We're open – edit",
-      edit: 'Edit hours',
-      dismiss: 'Dismiss',
+      confirmClosed: "Yes, we're closed",
+      confirmHours: "Yes, that's right",
+      editOpen: "No, we're open",
+      edit: 'Different hours',
+      dismiss: 'Keep as it is',
     },
     done: (hours) => `Done! ${hours} is updated.`,
     liveNow: (sites) => `Live now on ${sites}.`,
@@ -205,6 +246,12 @@ const copy: Record<Language, Copy> = {
     answered: 'That one is already answered, thanks!',
     useButtons: 'Please answer with the buttons, or open the link in the message.',
     standing: (business, days) => `As agreed, we've updated the hours for ${business}: ${days}.`,
+    standingSubject: (business) => `We've updated the hours for ${business}`,
+    answer: 'Answer',
+    connected: (business) =>
+      `All set! Suggestions about the hours for ${business} will come here, one at a time.`,
+    linkExpired: 'This link is no longer valid. Open a new one from the Integrations page.',
+    test: (business) => `Test message: suggestions for ${business} will come here.`,
     schoolBreak: 'School break',
     weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     reasons: {
@@ -277,19 +324,43 @@ export type SuggestionMessageInput = {
   language: Language;
 };
 
-/** The first contact about one suggestion: the question first, then what's at stake, then one reason. */
+/**
+ * The first contact about one suggestion, to be understood at a glance: the day, a yes-or-no question that the
+ * buttons answer, what Google shows now, then why we ask and why it matters.
+ *
+ *   📅 *Christmas Eve, Thu 24.12.*
+ *   Hi Aleksi! Are you open *07:30–13:00*?
+ *   Google now: 07:30–18:00
+ *
+ *   💡 Based on what you entered for this day in previous years.
+ *   👥 About 18 people will look you up that day.
+ *
+ *   Answer or see more: https://…
+ */
 export function suggestionMessage(m: SuggestionMessageInput): string {
   const c = copy[m.language];
   const people = Math.round(m.views);
   const reason = m.reasons.map((r) => translateReason(r, m.language)).find((r): r is string => !!r);
+  const closed = m.suggested === 'closed';
   const lines = [
-    `${c.hi(m.owner)} ${c.headline(m.dayName, localDay(m.date, m.language))}`,
-    `${c.weSuggest(localHours(m.suggested, m.language))} ${c.googleShows(localHours(m.shown, m.language))}`,
+    `📅 *${m.dayName}, ${localDay(m.date, m.language)}*`,
+    `${c.hi(m.owner)} ${closed ? c.askClosed : c.askOpen(localHours(m.suggested, m.language))}`,
+    c.googleNow(localHours(m.shown, m.language)),
   ];
-  if (people >= 2) lines.push(c.impact(people));
-  if (reason) lines.push('', reason);
-  lines.push('', c.edit(m.url));
+  const why = [reason && `💡 ${reason}`, people >= 2 && `👥 ${c.impact(people)}`].filter(Boolean);
+  if (why.length) lines.push('', ...(why as string[]));
+  lines.push('', c.link(m.url));
   return lines.join('\n');
+}
+
+/** The email subject: the question in a few words, e.g. "Christmas Eve: open 07:30–13:00?". */
+export function suggestionSubject(
+  m: Pick<SuggestionMessageInput, 'dayName' | 'suggested' | 'language'>,
+): string {
+  const c = copy[m.language];
+  return m.suggested === 'closed'
+    ? c.subjectClosed(m.dayName)
+    : c.subjectOpen(m.dayName, localHours(m.suggested, m.language));
 }
 
 /** Reply buttons for a suggestion, in the owner's language. Ids carry the action and the link's token. */

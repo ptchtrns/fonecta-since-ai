@@ -69,17 +69,27 @@ export async function isSelectableBusiness(entityId: string) {
   return (await find()).length > 0;
 }
 
-/** The first time someone takes on a business: its settings start from what the dataset knows about the owner. */
+/**
+ * The first time someone takes on a business: its profile, and a contact record if the dataset has none (a business
+ * from Yext), so the owner's contact preferences always have a place.
+ */
 export async function ensureProfile(entityId: string) {
-  const [contact] = await db.select().from(customerContact).where(eq(customerContact.entityId, entityId));
+  await db.insert(businessProfile).values({ entityId, edits: {} }).onConflictDoNothing();
+  // A business from Yext is gone after a reseed until it's synced again; its record comes with the next call.
+  const [known] = await db.select({ id: entity.id }).from(entity).where(eq(entity.id, entityId));
+  if (!known) return;
   await db
-    .insert(businessProfile)
+    .insert(customerContact)
     .values({
       entityId,
-      edits: {},
-      whatsappLanguage: contact?.preferredLanguage ?? 'en',
-      standingPermission: contact?.standingPermissionHolidays ?? false,
-      optedOut: contact?.optedOutOfSuggestions ?? false,
+      contactFirstName: '',
+      preferredChannel: 'WHATSAPP',
+      preferredLanguage: 'en',
+      email: '',
+      mobile: '',
+      bestContactWindow: '',
+      standingPermissionHolidays: false,
+      optedOutOfSuggestions: false,
     })
     .onConflictDoNothing();
 }
@@ -115,9 +125,11 @@ async function readBusiness(entityId: string) {
       contactFirstName: customerContact.contactFirstName,
       contact: {
         channel: customerContact.preferredChannel,
+        language: customerContact.preferredLanguage,
         window: customerContact.bestContactWindow,
         email: customerContact.email,
         mobile: customerContact.mobile,
+        standingPermission: customerContact.standingPermissionHolidays,
         optedOut: customerContact.optedOutOfSuggestions,
       },
     })
@@ -163,21 +175,30 @@ async function readBusiness(entityId: string) {
       ),
     } as EntityHours,
     timezone: e.timezone,
-    owner: row.contactFirstName ?? e.name,
+    owner: row.contactFirstName || e.name,
     shoppingCentreId: e.shoppingCentreId,
     segment: e.segment,
     whatsapp: {
       phone: row.profile?.whatsappPhone ?? '',
-      language: row.profile?.whatsappLanguage ?? 'en',
       on: row.profile?.whatsappOn ?? false,
       minImportance: row.profile?.whatsappMinImportance ?? 'low',
-      standingPermission: row.profile?.standingPermission ?? false,
       lastInboundAt: row.profile?.lastInboundAt ?? null,
     },
-    // How the owner wants to be reached, from the customer record. The opt-out is the owner's latest choice.
+    email: {
+      address: row.profile?.emailAddress ?? '',
+      on: row.profile?.emailOn ?? false,
+    },
+    telegram: {
+      chatId: row.profile?.telegramChatId ?? null,
+      name: row.profile?.telegramName ?? null,
+    },
+    // How the owner wants to be reached, from the customer record, which the owner edits on the Integrations page.
+    // `language` and `standingPermission` apply on every channel.
     contact: {
-      optedOut: row.profile?.optedOut ?? row.contact?.optedOut ?? false,
+      optedOut: row.contact?.optedOut ?? false,
       channel: row.contact?.channel ?? 'WHATSAPP',
+      language: row.contact?.language ?? 'en',
+      standingPermission: row.contact?.standingPermission ?? false,
       window: row.contact?.window ?? '',
       email: row.contact?.email ?? '',
       mobile: row.contact?.mobile ?? '',

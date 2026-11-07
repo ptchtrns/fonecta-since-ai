@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { importances, languages } from '~/db/schema';
+import { contactChannels, importances, languages } from '~/db/schema';
 import { HOURS_TEXT, WEEKDAYS, type Weekday } from '~/lib/hours';
 
 const entityId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, { message: 'Choose your business from the list' });
@@ -48,10 +48,7 @@ export const whatsappSchema = z
       .string()
       .trim()
       .regex(/^(\+[0-9 ]{7,20})?$/, { message: 'WhatsApp number with country code, e.g. +358 40 123 4567' }),
-    language: z.enum(languages),
     on: z.boolean(),
-    minImportance: z.enum(importances),
-    standingPermission: z.boolean(),
   })
   .refine((w) => !w.on || w.phone.length > 0, {
     message: 'Add your WhatsApp number first',
@@ -59,8 +56,39 @@ export const whatsappSchema = z
   });
 export type WhatsAppPayload = z.infer<typeof whatsappSchema>;
 
-export const contactSchema = z.object({
-  // The owner's own "no suggestion messages, thanks".
-  optedOut: z.boolean(),
+export const emailSchema = z
+  .object({
+    address: z
+      .string()
+      .trim()
+      .max(254)
+      .refine((v) => v === '' || z.email().safeParse(v).success, {
+        message: 'Enter an email address, e.g. owner@example.com',
+      }),
+    on: z.boolean(),
+  })
+  .refine((e) => !e.on || e.address.length > 0, {
+    message: 'Add your email address first',
+    path: ['address'],
+  });
+export type EmailPayload = z.infer<typeof emailSchema>;
+
+// What goes out and in which language, on every channel.
+export const messageSettingsSchema = z.object({
+  language: z.enum(languages),
+  minImportance: z.enum(importances),
+  standingPermission: z.boolean(),
 });
+export type MessageSettingsPayload = z.infer<typeof messageSettingsSchema>;
+
+// Either or both: each control on the page saves on its own.
+export const contactSchema = z
+  .object({
+    // The owner's own "no suggestion messages, thanks".
+    optedOut: z.boolean().optional(),
+    preferredChannel: z.enum(contactChannels).optional(),
+  })
+  .refine((c) => c.optedOut !== undefined || c.preferredChannel !== undefined, {
+    message: 'Nothing to save',
+  });
 export type ContactPayload = z.infer<typeof contactSchema>;

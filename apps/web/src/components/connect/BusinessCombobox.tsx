@@ -22,9 +22,12 @@ export function BusinessCombobox(props: {
   initial?: BusinessOption;
   onSelect?: (option: BusinessOption) => void;
 }) {
-  const [text, setText] = createSignal(props.initial ? `${props.initial.name}, ${props.initial.city}` : '');
+  // Derived so `initial` may come from a query that is still loading, and resets when it changes.
+  const [text, setText] = createSignal(() =>
+    props.initial ? `${props.initial.name}, ${props.initial.city}` : '',
+  );
   const [options, setOptions] = createSignal<BusinessOption[]>([]);
-  const [selected, setSelected] = createSignal<BusinessOption | null>(props.initial ?? null);
+  const [selected, setSelected] = createSignal<BusinessOption | null>(() => props.initial ?? null);
   const [open, setOpen] = createSignal(false);
   const [active, setActive] = createSignal(0);
   const [loading, setLoading] = createSignal(false);

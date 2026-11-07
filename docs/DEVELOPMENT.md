@@ -149,9 +149,11 @@ Dataset tables stay as they were loaded, so clicks in the demo can't change what
 
 | Table | What it holds |
 | ------------------ | -------------------------------------------------------------------------- |
-| `business_profile` | The owner's edits on top of `entity`, WhatsApp settings, standing permission |
+| `business_profile` | The owner's edits on top of `entity`, channel settings (WhatsApp, Telegram, email), which suggestions go out |
 | `suggestion_state` | One row per suggestion sent or answered: token for the link, decision, what was suggested |
 | `business_source` | Pages the owner linked, any number of them, and the hours found on them |
+
+One exception: the owner's contact preferences (opt-out, preferred channel, message language, standing permission for public holidays) are kept in the dataset's `customer_contact`, which the owner edits under Integrations → How we reach you. The predictor doesn't read that table, but a reseed resets these preferences to the dataset's values. A business without a record there (one from Yext) gets one when an account takes it on.
 
 Optional settings, all in `.dev.vars.example`:
 
