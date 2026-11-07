@@ -5,12 +5,13 @@ import re
 import ai
 
 # A review mentioning any of these is about opening hours, a closed door or a business that shut down.
+# Many customers describe a closed door as "everything was dark" (pimeä, släckt, mörkt, mørkt, dark).
 # This only picks which reviews the language model reads; the model decides what they say.
 HOURS_WORDS = [
-    "kiinni", "suljet", "aukiolo", "auki", "lopett", "pysyvä",
-    "stängt", "stängd", "öppettid", "öppet", "för gott",
-    "stengt", "åpningstid", "åpent", "lagt ned", "for godt",
-    "closed", "opening hours", "open", "permanent",
+    "kiinni", "suljet", "aukiolo", "auki", "lopett", "pysyvä", "pimeä",
+    "stängt", "stängd", "öppettid", "öppet", "för gott", "släckt", "mörkt",
+    "stengt", "åpningstid", "åpent", "lagt ned", "for godt", "mørkt",
+    "closed", "opening hours", "open", "permanent", "dark",
 ]
 
 # Finnish businesses get reviews in Finnish and English. Mistral-Small misread Finnish ("Kiva että olitte

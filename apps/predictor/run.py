@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from clues import flag_if_closed_for_good
+from clues import flag_if_closed_for_good, guess_from_stated_hours
 from decider import choose, confidence
 from hours import normal_hours, shown_on_google_back_then, shown_on_google_now
 from load import load_business_questions, load_everything, load_questions, load_yext_questions
@@ -134,7 +134,9 @@ def decide(data, season, question):
     options = options_for(data, business, question, shown, rejected)
     chosen = choose(options, season["name"])
     if chosen is None:
-        return None  # no option is likely enough to be worth a message
+        # The decider leaves the day alone. A customer may still have written down the business's new normal
+        # hours; past seasons have too few such reviews for the decider to learn from (clues/stated_hours.py).
+        return stated_hours_suggestion(data, business, question, shown, rejected)
 
     option, expected = chosen
     # Every clue that proposed these hours gives its own reason, so the owner may see several.
@@ -146,6 +148,20 @@ def decide(data, season, question):
         "hours": option["hours"],
         "confidence": round(confidence(expected), 3),
         "reasons": reasons,
+        "shown": shown,
+    }
+
+
+def stated_hours_suggestion(data, business, question, shown, rejected):
+    """A SUGGEST with the hours a customer says the business now has on this weekday, or None."""
+    guess = guess_from_stated_hours(data, business, question["date"])
+    if guess is None or guess["hours"] == shown or guess["hours"] in rejected:
+        return None
+    return {
+        "action": "SUGGEST",
+        "hours": guess["hours"],
+        "confidence": guess["confidence"],
+        "reasons": [guess["reason"]],
         "shown": shown,
     }
 
