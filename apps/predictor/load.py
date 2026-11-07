@@ -1,19 +1,25 @@
-"""Loads the challenge data, keeping only what Connect knew on the snapshot date.
+"""Loads the challenge data from the web app's local database, keeping only what Connect knew on the snapshot date.
 
 Everything entered, published or written on or after the snapshot is dropped here, so no clue
 can accidentally look into the future.
+
+The only answers in the database are in dev_truth_history, which is training data, used here only
+for days before the snapshot.
 """
 
-import csv
 import json
+import os
+import sqlite3
 from collections import defaultdict
 from datetime import date, timedelta
+from functools import lru_cache
 from pathlib import Path
 
 from hours import published_breaks
 
-DATA = Path(__file__).parents[2] / "data" / "fonecta-connect-suggests-2026" / "data"
-LABELS = DATA.parent / "labels"
+D1_FOLDER = Path(__file__).parents[1] / "web" / ".wrangler" / "state" / "v3" / "d1" / "miniflare-D1DatabaseObject"
+ALL_BUSINESSES = 3032
+HOW_TO_FILL = "Fill it from the repo root with: pnpm db:migrate && pnpm db:seed:full"
 
 
 def load_everything(snapshot):
@@ -42,11 +48,29 @@ def load_everything(snapshot):
     }
 
 
+def load_questions(season):
+    """Every (business, day) the season has to answer, in the order of the organisers' targets file."""
+    return database().execute(
+        "SELECT entity_id, date, day_key FROM evaluation_target WHERE season = ? ORDER BY rowid",
+        (season,),
+    ).fetchall()
+
+
 def load_businesses():
-    """Every business and shopping centre from entities.json, by business ID."""
+    """Every business and shopping centre by business ID, in the shape of the Yext entity they came from."""
     businesses = {}
-    for business in read_json("entities.json")["response"]["entities"]:
-        businesses[business["meta"]["id"]] = business
+    for row in database().execute("SELECT * FROM entity"):
+        business = {
+            "meta": {"id": row["id"], "countryCode": row["country"], "language": row["language"]},
+            "name": row["name"],
+            "c_segment": row["segment"],
+            "address": {"city": row["city"]},
+            "closed": bool(row["closed"]),
+            "hours": json.loads(row["hours"]),
+        }
+        if row["shopping_centre_id"]:
+            business["c_shoppingCenterEntityId"] = row["shopping_centre_id"]
+        businesses[row["id"]] = business
     return businesses
 
 
@@ -56,12 +80,17 @@ def load_holiday_history(snapshot):
     When an owner changed their mind about a date, the later entry comes last.
     """
     history = defaultdict(list)
-    for entry in read_jsonl("holiday_hours_history.jsonl"):
-        if entry["entered_at"] < snapshot:
-            history[(entry["entity_id"], entry["day_key"])].append(entry)
-
-    for entries in history.values():
-        entries.sort(key=lambda entry: entry["entered_at"])
+    rows = database().execute(
+        """SELECT entity_id, date, day_key, holiday_hours, entered_at, source
+           FROM holiday_hours_history
+           WHERE entered_at < ?
+           ORDER BY entity_id, day_key, entered_at, date""",
+        (snapshot,),
+    )
+    for row in rows:
+        entry = dict(row)
+        entry["holidayHours"] = json.loads(entry.pop("holiday_hours"))
+        history[(row["entity_id"], row["day_key"])].append(entry)
     return history
 
 
@@ -94,12 +123,18 @@ def last_entry_per_business(holiday_history):
 def load_regular_hours_history(snapshot):
     """Each business's published weekly hours, by business ID, oldest version first.
 
-    The first version is always "before-2024".
+    The first version is always "before-2024", which a plain sort would put after the dates.
     """
     history = defaultdict(list)
-    for version in read_jsonl("regular_hours_history.jsonl"):
-        if version["effective_from"] == "before-2024" or version["effective_from"] < snapshot:
-            history[version["entity_id"]].append(version)
+    rows = database().execute(
+        """SELECT entity_id, effective_from, hours
+           FROM regular_hours_history
+           WHERE effective_from = 'before-2024' OR effective_from < ?
+           ORDER BY entity_id, effective_from = 'before-2024' DESC, effective_from""",
+        (snapshot,),
+    )
+    for row in rows:
+        history[row["entity_id"]].append(dict(row, hours=json.loads(row["hours"])))
     return history
 
 
@@ -113,28 +148,22 @@ def find_seasonal_types(businesses, regular_hours_history, min_businesses=3):
 
 
 def load_peers():
-    """What similar businesses entered on each holiday, by (country, city size, business type, holiday).
-
-    All values are strings, as in the CSV.
-    """
+    """What similar businesses entered on each holiday, by (country, city size, business type, holiday)."""
     peers = {}
-    for row in read_csv(DATA / "peer_benchmarks.csv"):
-        peers[(row["country"], row["city_tier"], row["segment"], row["day_key"])] = row
+    for row in database().execute("SELECT * FROM peer_benchmark"):
+        peers[(row["country"], row["city_tier"], row["segment"], row["day_key"])] = dict(row)
     return peers
 
 
 def load_city_sizes():
     """City name to size class, e.g. "Helsinki" -> "capital"."""
-    city_sizes = {}
-    for row in read_csv(DATA / "cities.csv"):
-        city_sizes[row["city"]] = row["city_tier"]
-    return city_sizes
+    return {row["name"]: row["city_tier"] for row in database().execute("SELECT name, city_tier FROM city")}
 
 
 def load_holiday_calendar():
     """Which holiday a date is in each country, e.g. ("FI", "2025-12-26") -> "BOXING_DAY"."""
     holiday_on = {}
-    for row in read_csv(DATA / "calendar_special_days.csv"):
+    for row in database().execute("SELECT country, date, day_key FROM calendar_special_day"):
         holiday_on[(row["country"], row["date"])] = row["day_key"]
     return holiday_on
 
@@ -144,19 +173,22 @@ def load_snow_depth(snapshot):
     last_forecast_day = (date.fromisoformat(snapshot) + timedelta(days=10)).isoformat()
 
     snow_depth = {}
-    for row in read_csv(DATA / "weather_daily.csv"):
-        measured = row["is_forecast"] == "0" and row["date"] < snapshot
-        forecast = row["is_forecast"] == "1" and snapshot <= row["date"] <= last_forecast_day
-        if measured or forecast:
-            snow_depth[(row["city"], row["date"])] = float(row["snow_depth_cm"])
+    rows = database().execute(
+        """SELECT city, date, snow_depth_cm
+           FROM weather_daily
+           WHERE (is_forecast = 0 AND date < ?) OR (is_forecast = 1 AND date BETWEEN ? AND ?)""",
+        (snapshot, snapshot, last_forecast_day),
+    )
+    for row in rows:
+        snow_depth[(row["city"], row["date"])] = float(row["snow_depth_cm"])
     return snow_depth
 
 
 def load_snow_chance():
     """The long-term chance of at least 10 cm of snow, by (city, month, day)."""
     snow_chance = {}
-    for row in read_csv(DATA / "weather_normals.csv"):
-        snow_chance[(row["city"], int(row["month"]), int(row["day"]))] = float(row["p_snow_depth_ge_10cm"])
+    for row in database().execute("SELECT city, month, day, p_snow_depth_ge_10cm FROM weather_normal"):
+        snow_chance[(row["city"], row["month"], row["day"])] = row["p_snow_depth_ge_10cm"]
     return snow_chance
 
 
@@ -166,10 +198,7 @@ def load_true_closures(businesses, snapshot):
     Returns {(country, business type, holiday): {business ID: [days, closed days]}}.
     """
     closures = defaultdict(dict)
-    for row in read_csv(LABELS / "dev_truth_history.csv"):
-        if row["date"] >= snapshot:
-            continue
-
+    for row in true_history_before(snapshot):
         business = businesses[row["entity_id"]]
         group = (business["meta"]["countryCode"], business["c_segment"], row["day_key"])
         counts = closures[group].setdefault(row["entity_id"], [0, 0])
@@ -185,10 +214,7 @@ def load_true_closures_by_month(businesses, snapshot):
     Returns {(business type, month): {business ID: [days, closed days]}}.
     """
     closures = defaultdict(dict)
-    for row in read_csv(LABELS / "dev_truth_history.csv"):
-        if row["date"] >= snapshot:
-            continue
-
+    for row in true_history_before(snapshot):
         group = (businesses[row["entity_id"]]["c_segment"], int(row["date"][5:7]))
         counts = closures[group].setdefault(row["entity_id"], [0, 0])
         counts[0] += 1
@@ -197,40 +223,84 @@ def load_true_closures_by_month(businesses, snapshot):
     return closures
 
 
+def true_history_before(snapshot):
+    return database().execute(
+        "SELECT entity_id, date, day_key, truth_hours FROM dev_truth_history WHERE date < ?",
+        (snapshot,),
+    )
+
+
 def load_google_user_edits(snapshot):
     """Edits Google, Apple and Bing users suggested before the snapshot, by business ID.
 
     About half of them are wrong. Their status may have been decided after the snapshot.
     """
     edits = defaultdict(list)
-    for edit in read_json("publisher_suggestions.json")["response"]["suggestions"]:
-        if edit["dateCreated"] < snapshot:
-            edits[edit["locationId"]].append(edit)
+    rows = database().execute(
+        """SELECT entity_id, date_created, field_name, status, suggested_content
+           FROM publisher_suggestion
+           WHERE date_created < ?
+           ORDER BY id""",
+        (snapshot,),
+    )
+    for row in rows:
+        edits[row["entity_id"]].append({
+            "dateCreated": row["date_created"],
+            "fieldName": row["field_name"],
+            "status": row["status"],
+            "suggestedContent": row["suggested_content"],
+        })
     return edits
 
 
 def load_reviews(snapshot):
-    """Reviews written before the snapshot, by business ID. Each gets a "written_on" date."""
+    """Reviews written before the snapshot, by business ID. Each gets a "written_on" date.
+
+    A review with only a rating has None as its content.
+    """
     snapshot_date = date.fromisoformat(snapshot)
 
     reviews = defaultdict(list)
-    for review in read_json("reviews.json")["response"]["reviews"]:
-        review["written_on"] = date.fromtimestamp(review["publisherDate"] / 1000)
-        if review["written_on"] < snapshot_date:
-            reviews[review["locationId"]].append(review)
+    rows = database().execute(
+        "SELECT entity_id, rating, content, publisher_date FROM review ORDER BY entity_id, publisher_date, id"
+    )
+    for row in rows:
+        written_on = date.fromtimestamp(row["publisher_date"] / 1000)
+        if written_on < snapshot_date:
+            reviews[row["entity_id"]].append({
+                "rating": row["rating"],
+                "content": row["content"],
+                "written_on": written_on,
+            })
     return reviews
 
 
-def read_json(name):
-    with open(DATA / name, encoding="utf-8") as file:
-        return json.load(file)
+@lru_cache(maxsize=1)
+def database():
+    """A read-only connection to the local database, after checking that it holds the full dataset."""
+    path = database_path()
+    try:
+        connection = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
+        connection.row_factory = sqlite3.Row
+        businesses = connection.execute("SELECT COUNT(*) FROM entity").fetchone()[0]
+        has_training_data = connection.execute("SELECT EXISTS (SELECT 1 FROM dev_truth_history)").fetchone()[0]
+    except sqlite3.OperationalError as error:
+        raise SystemExit(f"Can't read the database at {path} ({error}). {HOW_TO_FILL}")
+
+    # The demo set would quietly give worse guesses and overwrite predictions_2026.csv with a tiny file.
+    if businesses < ALL_BUSINESSES or not has_training_data:
+        raise SystemExit(f"The database holds {businesses} businesses, not the full dataset. {HOW_TO_FILL}")
+    return connection
 
 
-def read_jsonl(name):
-    with open(DATA / name, encoding="utf-8") as file:
-        return [json.loads(line) for line in file]
+def database_path():
+    """PREDICTOR_DB if set, otherwise the only database in the web app's local D1 folder."""
+    if os.environ.get("PREDICTOR_DB"):
+        return Path(os.environ["PREDICTOR_DB"]).resolve()
 
-
-def read_csv(path):
-    with open(path, encoding="utf-8") as file:
-        return list(csv.DictReader(file))
+    found = [path for path in D1_FOLDER.glob("*.sqlite") if path.name != "metadata.sqlite"]
+    if not found:
+        raise SystemExit(f"No database in {D1_FOLDER}. {HOW_TO_FILL}")
+    if len(found) > 1:
+        raise SystemExit(f"Several databases in {D1_FOLDER}, set PREDICTOR_DB to the right one.")
+    return found[0]

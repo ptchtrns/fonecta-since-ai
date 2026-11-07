@@ -2,16 +2,28 @@
 
 Decides, for every business and special day from 7 Nov 2026 to 6 Jan 2027, whether to **suggest** new hours, **flag** the business for a human, or **do nothing**. Its output is `predictions_2026.csv`, which the organisers score.
 
-Plain Python, standard library only. Reads the data files directly. It doesn't use the web app's database, because that only holds the 32 demo businesses.
+Plain Python, standard library only. Reads the web app's local database (`apps/web/.wrangler`), loaded with the full dataset. It stops with an error if that database holds only the 32 demo businesses, because the demo set has no training data and would overwrite `predictions_2026.csv` with a tiny file.
 
 ## Run it
 
-From the repo root:
+From the repo root, once per clone and after any reseed (needs Node, pnpm and uv, see `docs/DEVELOPMENT.md`):
+
+```sh
+pnpm install && pnpm db:migrate && pnpm db:seed:full
+```
+
+Then:
 
 ```sh
 python3 apps/predictor/run.py                 # 2026 season → predictions_2026.csv + score
 python3 apps/predictor/run.py --season 2025   # back-test: pretends today is 6 Nov 2025
+python3 apps/predictor/run.py --save local    # also show the 2026 predictions on the dashboard
+python3 apps/predictor/run.py --save remote   # the same for the deployed site, demo businesses only
 ```
+
+`--save` replaces the `prediction` table, which `/dashboard/suggestions` shows. Run `pnpm db:migrate:remote` in `apps/web` before the first `--save remote`. Reseeding empties the table, so save again afterwards.
+
+The questions and all the data come from the database. `evaluate.py` is the organisers' scorer and still reads the labels from `labels/*.csv`. To read another database file, set `PREDICTOR_DB`.
 
 The reviews are read by language models on [Featherless](https://featherless.ai). Put the key in the `.env` file in the repo root (gitignored):
 
@@ -45,7 +57,8 @@ For every question (one business on one day):
 | File | What it does | Status |
 |---|---|---|
 | `run.py` | Goes through every question, asks the clues, writes predictions, prints the score | Working |
-| `load.py` | Reads every data file once, groups the rows by business and drops everything from on or after the snapshot date, so no clue can look into the future | Done |
+| `load.py` | Reads the database once, groups the rows by business and drops everything from on or after the snapshot date, so no clue can look into the future | Done |
+| `save.py` | Puts the predictions with their reasons in the `prediction` table for the dashboard, through Wrangler | Done |
 | `hours.py` | What Google shows: `shown_on_google_now` (2026, from entities.json, matches the labels exactly) and `shown_on_google_back_then` (2025 back-test, rebuilt from history, 27 of 11,118 rows differ). Also `normal_hours` and `published_breaks` | Done |
 | `combine.py` | Combines the clues: agreeing clues raise the confidence, `1 - (1 - c1) × (1 - c2) × …`, so two clues at 0.7 give 0.91 | Done |
 | `ai.py` | Asks a language model on Featherless (or a local one through Ollama) and returns its JSON answer. Every answer is cached in `ai_cache.json`. Waits and tries again while Featherless is busy, and stops a run after 2 million tokens | Done |
@@ -134,10 +147,10 @@ data = {
 
     "peers": {
         ("FI", "capital", "cafe", "XMAS_EVE"): {
-            "share_entered_closed": "0.168",
+            "share_entered_closed": 0.168,
             "median_open_special": "10:00",
             "median_close_special": "13:00",
-            ...                                        # all values are strings
+            ...
         },
     },
 
@@ -156,13 +169,13 @@ data = {
 
     "reviews": {
         "FI-00001": [
-            {"rating": 2, "content": "Joulupäivänä ovet kiinni...", "written_on": date(2024, 12, 27), ...},
+            {"rating": 2, "content": "Joulupäivänä ovet kiinni...", "written_on": date(2024, 12, 27)},
         ],
     },
 }
 ```
 
-Field meanings: `data/fonecta-connect-suggests-2026/docs/DATA_DICTIONARY.md`.
+Field meanings: `data/fonecta-connect-suggests-2026/docs/DATA_DICTIONARY.md`. The tables are in `apps/web/src/db/schema.ts`.
 
 ## How a clue should look
 
@@ -182,7 +195,7 @@ Add it to `clues/__init__.py` and to the list passed to `combine` in `run.py`. T
 
 ## Rules
 
-- **`labels/` holds the answers.** Use them only to check the score and as training data. `dev_truth_history.csv` is given for training: `type_habits` and `seasonal_break` learn from it how often each business *type* closes, using only days before the snapshot and leaving the business itself out, so a dev business's own answers never decide its guess.
+- **`labels/` holds the answers.** Use them only to check the score and as training data. The scorer's answers aren't in the database: `run.py` passes `evaluate.py` the `labels/dev_labels_*.csv` files. `dev_truth_history` is the only answer table there, given for training: `type_habits` and `seasonal_break` learn from it how often each business *type* closes, using only days before the snapshot and leaving the business itself out, so a dev business's own answers never decide its guess.
 - **No future data.** `load.py` already drops anything entered, published or written on or after the snapshot date. A new data source should be filtered there too.
 - Keep the dev rows in the final `predictions_2026.csv`.
 

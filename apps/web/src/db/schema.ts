@@ -507,30 +507,9 @@ export const evaluationTarget = sqliteTable(
   ],
 );
 
-// Answers and simulator truth, dev and demo businesses only. These must not reach anything that produces
-// predictions, or the dev score stops meaning anything.
-
-export const devLabel = sqliteTable(
-  'dev_label',
-  {
-    entityId: text('entity_id')
-      .notNull()
-      .references(() => entity.id),
-    date: text('date').notNull(),
-    season: integer('season').notNull(),
-    dayKey: text('day_key').notNull(),
-    eventId: text('event_id').references(() => localEvent.id),
-    truthHours: text('truth_hours').notNull(),
-    displayedHoursAtSnapshot: text('displayed_hours_at_snapshot').notNull(),
-    needsAction: integer('needs_action', { mode: 'boolean' }).notNull(),
-    expectedAction: text('expected_action', { enum: ['SUGGEST', 'NO_ACTION', 'FLAG'] }).notNull(),
-    mismatchType: text('mismatch_type', {
-      enum: ['DIFFERENT_HOURS', 'SHOWN_CLOSED_ACTUALLY_OPEN', 'SHOWN_OPEN_ACTUALLY_CLOSED'],
-    }),
-    expectedSearchViews: real('expected_search_views').notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.entityId, t.date] }), index('dev_label_season_idx').on(t.season)],
-);
+// What dev businesses really did on past special days, the only answers kept in the database. The predictor
+// learns from it how each business type behaves, using only days before the snapshot and never a business's
+// own answers for its guess. Everything else about the answers stays in the dataset's files.
 
 export const devTruthHistory = sqliteTable(
   'dev_truth_history',
@@ -547,33 +526,23 @@ export const devTruthHistory = sqliteTable(
   (t) => [primaryKey({ columns: [t.entityId, t.date] })],
 );
 
-export const devRegularHoursTruth = sqliteTable('dev_regular_hours_truth', {
-  entityId: text('entity_id')
-    .primaryKey()
-    .references(() => entity.id),
-  trueRegularHoursNow: text('true_regular_hours_now', { mode: 'json' }).$type<WeekHours>().notNull(),
-  listingIsOutdated: integer('listing_is_outdated', { mode: 'boolean' }).notNull(),
-  permanentlyClosed: integer('permanently_closed', { mode: 'boolean' }).notNull(),
-});
+// What apps/predictor decided for the 2026 season, saved by `run.py --save`. NO_ACTION days have no row.
+// Reseeding the dataset deletes the rows through the cascade, so run the predictor again afterwards.
 
-// Owner simulator inputs from mock_api/sim_data.json.
-
-export const simPersona = sqliteTable('sim_persona', {
-  entityId: text('entity_id')
-    .primaryKey()
-    .references(() => entity.id),
-  responsiveness: real('responsiveness').notNull(),
-  channel: text('channel', { enum: contactChannels }).notNull(),
-});
-
-export const simTruth = sqliteTable(
-  'sim_truth',
+export const prediction = sqliteTable(
+  'prediction',
   {
     entityId: text('entity_id')
       .notNull()
-      .references(() => entity.id),
+      .references(() => entity.id, { onDelete: 'cascade' }),
     date: text('date').notNull(),
-    hours: text('hours').notNull(),
+    dayKey: text('day_key').notNull(),
+    action: text('action', { enum: ['SUGGEST', 'FLAG'] }).notNull(),
+    shownHours: text('shown_hours').notNull(),
+    // Null for a FLAG, which goes to a person instead of suggesting hours.
+    hours: text('hours'),
+    confidence: real('confidence'),
+    reasons: text('reasons', { mode: 'json' }).$type<string[]>().notNull(),
   },
   (t) => [primaryKey({ columns: [t.entityId, t.date] })],
 );

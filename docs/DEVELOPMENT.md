@@ -15,6 +15,7 @@ Full-stack TypeScript on Cloudflare plus a Python worker for anything that needs
 apps/
   web/      Solid app, deployed as a Cloudflare Worker
   worker/   Python job processor, runs anywhere with network access to web
+  predictor/ Python, decides what to suggest. Reads the local database, see its README
 packages/   Shared code, if it ever becomes necessary
 ```
 
@@ -111,18 +112,22 @@ pnpm db:seed:full                  # everything, local
 pnpm --filter web db:seed:remote   # demo set, deployed database
 ```
 
-Each run empties and refills the dataset tables and leaves app tables alone.
+Each run empties and refills the dataset tables and leaves app tables alone, except `prediction`, which is emptied along with the businesses. Run the predictor with `--save` again afterwards.
 
 | Load     | Businesses | Rows | Size   | Est. rows written |
 | -------- | ---------- | ---- | ------ | ----------------- |
 | Demo set | 32         | 29k  | 3.4 MB | 61k               |
 | Full     | 3,032      | 3.5M | 272 MB | over 7M           |
 
-The demo set is the 17 demo businesses and 15 shopping centres. It keeps their full holiday history and reviews, limits analytics and daily weather to 1 Nov 2025 onwards, and limits weather and peer data to what they use. It has no `dev` or `test` businesses, so the `dev_*` tables stay empty and the 2025 back-test targets aren't loaded. Work across all businesses, such as producing `predictions_2026.csv`, has to read the files in `data/`.
+The demo set is the 17 demo businesses and 15 shopping centres. It keeps their full holiday history and reviews, limits analytics and daily weather to 1 Nov 2025 onwards, and limits weather and peer data to what they use. It has no `dev` or `test` businesses, so `dev_truth_history` stays empty and the 2025 back-test targets aren't loaded. Work across all businesses, such as producing `predictions_2026.csv`, needs the full load: `apps/predictor` reads it from the local database and refuses to run on the demo set.
 
 D1's free plan allows [100,000 written rows a day](https://developers.cloudflare.com/d1/platform/limits/), and indexes count as writes. The demo set fits once a day. A second load on the same day probably won't, because deleting the old rows counts too. The full load needs the paid plan.
 
-The `dev_*` and `sim_truth` tables hold answers, so keep them out of anything that produces predictions.
+The only answers loaded are in `dev_truth_history`, which the predictor uses as training data, only for days before the snapshot. The scorer's labels and the owner simulator's data stay in the dataset's files, where `evaluate.py` and `mock_api` read them.
+
+## Predictions on the dashboard
+
+`python3 apps/predictor/run.py --save local` replaces the `prediction` table through Wrangler, and `/dashboard/suggestions` shows the rows for the demo businesses. For the deployed site, use `--save remote` after a full local load: the predictor always computes locally and sends only the demo businesses' rows, because the deployed database doesn't have the others.
 
 ## Deploying
 
