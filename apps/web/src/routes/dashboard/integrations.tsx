@@ -1,6 +1,6 @@
 import { Title } from '@solidjs/meta';
-import { revalidate, type RouteDefinition } from '@solidjs/router';
-import { createMemo, createSignal, For, Show } from 'solid-js';
+import { revalidate, useBeforeLeave, type RouteDefinition } from '@solidjs/router';
+import { createMemo, createSignal, For, onSettled, Show } from 'solid-js';
 import { FormField } from '~/components/FormField';
 import { FormMessage } from '~/components/FormMessage';
 import { Page, PageHeader, Panel } from '~/components/connect/Page';
@@ -37,6 +37,20 @@ const levels: { value: Importance; title: string; text: string }[] = [
   },
 ];
 
+/** The settings as the form holds them. Phones are compared without spaces, as the server stores them. */
+function readForm(el: HTMLFormElement) {
+  const data = new FormData(el);
+  return {
+    phone: String(data.get('phone') ?? '').replace(/\s+/g, ''),
+    language: data.get('language'),
+    on: data.get('on') === 'on',
+    minImportance: data.get('minImportance'),
+    standingPermission: data.get('standingPermission') === 'on',
+  };
+}
+type FormValues = ReturnType<typeof readForm>;
+const optionKeys = ['language', 'on', 'minImportance', 'standingPermission'] as const;
+
 export default function Integrations() {
   const workspace = createMemo(() => getWorkspace() as Promise<Workspace>);
   const whatsapp = () => workspace().whatsapp;
@@ -50,16 +64,34 @@ export default function Integrations() {
   const form = createFormState();
   const test = createFormState();
 
+  // What the form holds after the owner's last edit; null until they touch it. Unsaved changes are
+  // the fields that differ from what's saved, so saving (or undoing an edit) clears them by itself.
+  const [edited, setEdited] = createSignal<FormValues | null>(null);
+  const changed = (key: keyof FormValues) => {
+    const values = edited();
+    return values !== null && values[key] !== whatsapp()[key];
+  };
+  const optionsChanged = () => optionKeys.some(changed);
+  const unsaved = () => changed('phone') || optionsChanged();
+
+  useBeforeLeave((event) => {
+    if (!unsaved() || event.defaultPrevented) return;
+    event.preventDefault();
+    setTimeout(() => {
+      if (window.confirm('Leave without saving your WhatsApp settings?')) event.retry(true);
+    }, 100);
+  });
+  onSettled(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (unsaved()) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  });
+
   function onSubmit(event: SubmitEvent) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget as HTMLFormElement);
-    const payload = form.validate(whatsappSchema, {
-      phone: String(data.get('phone') ?? ''),
-      language: data.get('language'),
-      on: data.get('on') === 'on',
-      minImportance: data.get('minImportance'),
-      standingPermission: data.get('standingPermission') === 'on',
-    });
+    const payload = form.validate(whatsappSchema, readForm(event.currentTarget as HTMLFormElement));
     if (!payload) return;
     return form.submit(
       async () => (await apiSend('/api/workspace/whatsapp', 'PATCH', payload)).message,
@@ -77,7 +109,12 @@ export default function Integrations() {
       <PageHeader title="Integrations" />
 
       <Panel>
-        <form class="flex flex-col gap-4" onSubmit={onSubmit} novalidate>
+        <form
+          class="flex flex-col gap-4"
+          onSubmit={onSubmit}
+          onInput={(event) => setEdited(readForm(event.currentTarget))}
+          novalidate
+        >
           <div class="flex items-center gap-3">
             <BrandMark name="WhatsApp" class="size-8" />
             <div class="min-w-0 flex-1">
@@ -118,13 +155,25 @@ export default function Integrations() {
                 Save
               </button>
             </div>
-            <Show when={form.fieldErrors().phone}>
+            <Show
+              when={form.fieldErrors().phone}
+              fallback={
+                <Show when={unsaved()}>
+                  <span class="text-sm text-base-content/60">You have unsaved changes.</span>
+                </Show>
+              }
+            >
               {(error) => <span class="text-error">{error()}</span>}
             </Show>
           </div>
 
           <details class="collapse-arrow collapse rounded-box border border-base-300">
-            <summary class="collapse-title min-h-0 py-3 text-sm font-medium">More options</summary>
+            <summary class="collapse-title flex min-h-0 items-center gap-2 py-3 text-sm font-medium">
+              More options
+              <Show when={optionsChanged()}>
+                <span class="badge badge-soft badge-warning badge-sm">Unsaved</span>
+              </Show>
+            </summary>
             <div class="collapse-content flex flex-col gap-4">
               <FormField label="Message language">
                 <select name="language" class="select w-full sm:w-1/2">
@@ -233,6 +282,9 @@ export default function Integrations() {
                         Open the answer page
                       </a>
                     </div>
+                    <Show when={unsaved()}>
+                      <p class="text-sm text-base-content/60">This shows your saved settings.</p>
+                    </Show>
                     <WhatsAppPreview body={preview().body} buttons={preview().buttons} />
                   </div>
                 )}
@@ -240,8 +292,18 @@ export default function Integrations() {
 
               <Show when={whatsapp().configured && whatsapp().phone}>
                 <FormMessage message={test.message()} />
-                <div class="flex justify-end">
-                  <button type="button" class="btn btn-ghost" disabled={test.pending()} onClick={sendTest}>
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                  <Show when={unsaved()}>
+                    <span class="text-sm text-base-content/60">
+                      Save first: the test uses your saved settings.
+                    </span>
+                  </Show>
+                  <button
+                    type="button"
+                    class="btn btn-ghost"
+                    disabled={test.pending() || unsaved()}
+                    onClick={sendTest}
+                  >
                     Send test message
                   </button>
                 </div>
