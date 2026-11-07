@@ -8,7 +8,13 @@ import csv
 import subprocess
 from pathlib import Path
 
-from clues import guess_from_last_year, guess_from_mall, guess_from_peers, guess_from_reviews
+from clues import (
+    guess_from_last_year,
+    guess_from_mall,
+    guess_from_peers,
+    guess_from_reviews,
+    guess_from_type_habits,
+)
 from combine import combine
 from hours import shown_on_google_back_then, shown_on_google_now
 from load import load_everything
@@ -61,6 +67,7 @@ def main():
                 guess_from_last_year(data, business, question["day_key"], question["date"]),
                 guess_from_reviews(data, business, question["day_key"]),
                 guess_from_peers(data, business, question["day_key"]),
+                guess_from_type_habits(data, business, question["day_key"]),
             ])
 
             if guess and guess["hours"] != shown:

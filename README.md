@@ -40,7 +40,13 @@ Demo: TODO
 
 ## Customer with no history / no previous actions
 
-The predictor falls back to similar businesses (same country, city size and type) and only suggests "closed" when enough of them close. Otherwise it stays quiet, because owners with no history almost always keep their normal hours (see above). TODO: show `FI-D0017` Kahvila Kipinä in the demo.
+When an owner has never entered anything for a holiday, the predictor falls back to what businesses like theirs do:
+
+- **How often the same type of business really closes** on that holiday in the same country, learned from the true hours of the training businesses. It suggests "closed" when at least 80% of them closed.
+- **What similar businesses entered** (same country, city size and type): "closed" when at least 20% of them entered closed.
+- **Recent reviews** where customers found the doors closed on that holiday.
+
+Otherwise it stays quiet, because owners with no history almost always keep their normal hours (see above). TODO: show `FI-D0017` Kahvila Kipinä in the demo.
 
 ## Final customer messages (as text)
 

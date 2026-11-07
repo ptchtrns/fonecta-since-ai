@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 DATA = Path(__file__).parents[2] / "data" / "fonecta-connect-suggests-2026" / "data"
+LABELS = DATA.parent / "labels"
 
 
 def load_businesses():
@@ -126,15 +127,40 @@ def group_by_date(holiday_history):
     return by_date
 
 
+def load_true_closures(businesses, snapshot):
+    """Count how often the dev businesses were really closed on each holiday before the snapshot date.
+
+    This is training data: the true hours of the dev businesses, given with the challenge.
+    Returns {(country, business_type, holiday): {business_id: [days, closed_days]}}.
+    """
+    closures = defaultdict(dict)
+
+    with open(LABELS / "dev_truth_history.csv", encoding="utf-8") as file:
+        for row in csv.DictReader(file):
+            if row["date"] >= snapshot:
+                continue
+
+            business = businesses[row["entity_id"]]
+            key = (business["meta"]["countryCode"], business["c_segment"], row["day_key"])
+            counts = closures[key].setdefault(row["entity_id"], [0, 0])
+            counts[0] += 1
+            if row["truth_hours"] == "closed":
+                counts[1] += 1
+
+    return closures
+
+
 def load_everything(snapshot):
     """Load every data file once into one dict, e.g. data["businesses"]["FI-D0001"].
 
     snapshot is the date the run pretends is today. Nothing entered after it may be used.
     """
+    businesses = load_businesses()
     holiday_history = load_holiday_history()
     return {
         "snapshot": snapshot,
-        "businesses": load_businesses(),
+        "businesses": businesses,
+        "true_closures": load_true_closures(businesses, snapshot),
         "holiday_history": holiday_history,
         "holiday_history_by_date": group_by_date(holiday_history),
         "regular_hours_history": load_regular_hours_history(),
