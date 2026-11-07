@@ -63,7 +63,7 @@ export function BusinessCard(props: { business: Workspace['business'] }) {
       <div class="card-body gap-4">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <h1 class="text-xl font-semibold tracking-tight text-balance">{b().name}</h1>
+            <h2 class="text-xl font-semibold tracking-tight text-balance">{b().name}</h2>
             <p class="flex items-center gap-2 text-sm text-base-content/60">
               {b().category}
               <Show when={b().source === 'yext'}>

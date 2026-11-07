@@ -8,7 +8,7 @@ import { BrandMark } from '~/components/connect/PublisherLogo';
 // assistive tech.
 
 const nav = [
-  { label: 'Home', icon: HomeIcon, count: '3', active: true },
+  { label: 'Front page', icon: HomeIcon, count: '3', active: true },
   { label: 'Sources', icon: ShieldIcon },
   { label: 'Integrations', icon: PlugIcon },
 ];
@@ -43,7 +43,7 @@ export function ProductPreview() {
             </div>
           </div>
 
-          {/* Home page: suggestions, with the business card left of them on wide screens */}
+          {/* Front page: suggestions, with the business card left of them on wide screens */}
           <div class="flex min-w-0 flex-1 flex-col gap-4 p-5 sm:p-6">
             <div class="flex items-baseline justify-between gap-3">
               <div class="text-sm font-semibold">Suggestions</div>

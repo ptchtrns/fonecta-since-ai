@@ -315,6 +315,8 @@ export const entity = sqliteTable(
     longitude: real('longitude').notNull(),
     mainPhone: text('main_phone').notNull(),
     websiteUrl: text('website_url').notNull(),
+    // Not in the dataset, whose businesses have no description. Businesses from Yext keep theirs here.
+    description: text('description'),
     categoryId: text('category_id')
       .notNull()
       .references(() => category.id),

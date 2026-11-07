@@ -7,6 +7,7 @@ import { whatsappEnabled } from '~/server/whatsapp';
 import { publishes } from '~/server/yext';
 import { getBusiness } from '~/services/business.service';
 import { buildMessage, sendable } from '~/services/contact.service';
+import { getPresence } from '~/services/presence.service';
 import { builtInSources, listLinkedSources } from '~/services/sources.service';
 import { listSuggestions, upcomingExceptions } from '~/services/suggestions.service';
 import { syncYextBusiness } from '~/services/yext-business.service';
@@ -19,11 +20,12 @@ export async function getWorkspace(entityId: string, origin: string) {
   const business = await getBusiness(entityId);
   if (!business) return null;
 
-  const [suggestions, exceptions, linked, builtIn] = await Promise.all([
+  const [suggestions, exceptions, linked, builtIn, presence] = await Promise.all([
     listSuggestions(business),
     upcomingExceptions(business),
     listLinkedSources(entityId),
     builtInSources(business),
+    getPresence(business),
   ]);
 
   // The message the owner would get next, to show on the Integrations page.
@@ -36,6 +38,7 @@ export async function getWorkspace(entityId: string, origin: string) {
       source: business.source,
       name: business.name,
       category: business.category,
+      product: business.product,
       addressLine1: business.addressLine1,
       postalCode: business.postalCode,
       city: business.city,
@@ -46,6 +49,7 @@ export async function getWorkspace(entityId: string, origin: string) {
       exceptions,
     },
     suggestions,
+    presence,
     sources: {
       builtIn,
       linked: linked.map((s) => ({
