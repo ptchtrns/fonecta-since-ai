@@ -152,7 +152,7 @@ async function readBusiness(entityId: string) {
     country: e.country,
     phone: edits.phone ?? e.mainPhone,
     website: edits.website ?? e.websiteUrl,
-    description: edits.description ?? '',
+    description: edits.description ?? e.description ?? '',
     // Everything a write to Yext has to include, since it replaces the whole hours object.
     hours: {
       ...e.hours,
@@ -162,6 +162,7 @@ async function readBusiness(entityId: string) {
         approved.flatMap((a) => (a.hours ? [{ date: a.date, hours: a.hours }] : [])),
       ),
     } as EntityHours,
+    timezone: e.timezone,
     owner: row.contactFirstName ?? e.name,
     shoppingCentreId: e.shoppingCentreId,
     segment: e.segment,

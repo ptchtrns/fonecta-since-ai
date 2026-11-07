@@ -12,7 +12,13 @@
     "db:migrate": "vp run web#db:migrate",
     "db:seed": "vp run --no-cache web#db:seed",
     "db:seed:limited": "vp run --no-cache web#db:seed:limited",
-    "deploy": "vp run web#deploy"
+    "deploy": "vp run web#deploy",
+    "predict": "python3 apps/predictor/run.py",
+    "predict:backtest": "python3 apps/predictor/run.py --season 2025",
+    "predict:save": "python3 apps/predictor/run.py --save local",
+    "predict:save:remote": "python3 apps/predictor/run.py --save remote",
+    "worker": "uv run --directory apps/worker worker",
+    "yext-mock": "python3 data/fonecta-connect-suggests-2026/mock_api/server.py"
   },
   "devDependencies": {
     "vite-plus": "1.4.0"

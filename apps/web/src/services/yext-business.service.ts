@@ -81,6 +81,7 @@ async function toRow(e: YextEntity): Promise<typeof entity.$inferInsert | null> 
     longitude: at?.longitude ?? place.lon,
     mainPhone: e.mainPhone ?? '',
     websiteUrl: e.websiteUrl?.url ?? '',
+    description: e.description ?? null,
     categoryId: segment.id,
     segment: segment.segment,
     timezone: e.timezone ?? TIMEZONE_OF[country],

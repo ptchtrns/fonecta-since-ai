@@ -1,6 +1,14 @@
 import 'server-only';
 import { and, eq } from 'drizzle-orm';
-import { businessProfile, outbox, suggestionState, user, type ContactChannel } from '~/db/schema';
+import {
+  businessProfile,
+  languages,
+  outbox,
+  suggestionState,
+  user,
+  type ContactChannel,
+  type Language,
+} from '~/db/schema';
 import {
   confirmationMessage,
   localDay,
@@ -47,14 +55,8 @@ export function suggestionUrl(origin: string, token: string) {
   return `${origin}/s/${token}`;
 }
 
-/** The message as the owner would get it, for the Integrations page and for sending. */
-export async function buildMessage(business: Business, item: SuggestionItem, origin: string) {
-  const state = await ensureState(business.id, item);
-  const language = business.whatsapp.language;
-  const url = suggestionUrl(origin, state.token);
+function compose(business: Business, item: SuggestionItem, url: string, token: string, language: Language) {
   return {
-    state,
-    url,
     body: suggestionMessage({
       owner: business.owner,
       dayName: item.dayNames[language],
@@ -66,8 +68,28 @@ export async function buildMessage(business: Business, item: SuggestionItem, ori
       url,
       language,
     }),
-    buttons: suggestionButtons(item.suggested!, state.token, language),
+    buttons: suggestionButtons(item.suggested!, token, language),
   };
+}
+
+/** The message as the owner gets it, in their language. */
+export async function buildMessage(business: Business, item: SuggestionItem, origin: string) {
+  const state = await ensureState(business.id, item);
+  const url = suggestionUrl(origin, state.token);
+  return { state, url, ...compose(business, item, url, state.token, business.whatsapp.language) };
+}
+
+/** The next message in every language, so the Integrations page can show it in the one the owner is picking. */
+export async function previewMessage(business: Business, item: SuggestionItem, origin: string) {
+  const state = await ensureState(business.id, item);
+  const url = suggestionUrl(origin, state.token);
+  const messages = Object.fromEntries(
+    languages.map((language) => {
+      const message = compose(business, item, url, state.token, language);
+      return [language, { body: message.body, buttons: message.buttons.map((b) => b.title) }];
+    }),
+  ) as Record<Language, { body: string; buttons: string[] }>;
+  return { url, messages };
 }
 
 const inWindow = (business: Business) =>

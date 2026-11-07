@@ -11,7 +11,7 @@ import {
 import { linkUserToBusiness } from '~/services/business.service';
 import { onBusinessLinked } from '~/services/contact.service';
 
-/** Chooses the account's business: for accounts from before sign-up asked, and for changing it in Settings. */
+/** Chooses the account's business: for accounts from before sign-up asked, and for changing it in Account. */
 export async function POST(event: ApiEvent) {
   const user = currentUser(event);
   if (!user) return unauthorized();

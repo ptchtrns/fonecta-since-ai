@@ -1,4 +1,4 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, For, Show } from 'solid-js';
 
 // Logos of the sites a listing is published to. Paths and colours are from Simple Icons (CC0,
 // https://simpleicons.org). Sites it doesn't cover get their first letter on a tile.
@@ -119,6 +119,22 @@ export function PublisherLogo(props: { name: string; size?: 'sm' | 'md' }) {
         />
       )}
     </Show>
+  );
+}
+
+/** Sites' logos in a row, each named on hover and for screen readers. */
+export function LogoStrip(props: { sites: { name: string; logo: string }[] }) {
+  return (
+    <ul class="flex flex-wrap items-center gap-1.5">
+      <For each={props.sites}>
+        {(site) => (
+          <li title={site.name}>
+            <PublisherLogo name={site.logo} size="sm" />
+            <span class="sr-only">{site.name}</span>
+          </li>
+        )}
+      </For>
+    </ul>
   );
 }
 

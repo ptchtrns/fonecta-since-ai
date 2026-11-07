@@ -8,8 +8,7 @@ import { BrandMark } from '~/components/connect/PublisherLogo';
 // assistive tech.
 
 const nav = [
-  { label: 'Home', icon: HomeIcon, count: '3', active: true },
-  { label: 'Sources', icon: ShieldIcon },
+  { label: 'Front page', icon: HomeIcon, count: '3', active: true },
   { label: 'Integrations', icon: PlugIcon },
 ];
 
@@ -43,7 +42,7 @@ export function ProductPreview() {
             </div>
           </div>
 
-          {/* Home page: suggestions, with the business card left of them on wide screens */}
+          {/* Front page: suggestions, with the business card left of them on wide screens */}
           <div class="flex min-w-0 flex-1 flex-col gap-4 p-5 sm:p-6">
             <div class="flex items-baseline justify-between gap-3">
               <div class="text-sm font-semibold">Suggestions</div>
@@ -196,14 +195,6 @@ function HomeIcon() {
   return (
     <Icon>
       <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1Z" />
-    </Icon>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <Icon>
-      <path d="M12 22s8-3 8-10V5l-8-3-8 3v7c0 7 8 10 8 10Z" />
     </Icon>
   );
 }
