@@ -21,11 +21,13 @@ type ReasonCopy = {
 type Copy = {
   hi: (name: string) => string;
   closed: string;
-  dayIs: (name: string, day: string) => string;
+  headline: (name: string, day: string) => string;
   googleShows: (hours: string) => string;
-  weSuggest: (day: string, hours: string) => string;
+  weSuggest: (hours: string) => string;
+  impact: (people: number) => string;
   edit: (url: string) => string;
-  buttons: { approve: string; edit: string; reject: string };
+  /** Reply buttons, at most 20 characters each. */
+  buttons: { confirmClosed: string; confirmHours: string; editOpen: string; edit: string; dismiss: string };
   done: (hours: string) => string;
   liveNow: (sites: string) => string;
   liveSoon: (sites: string, when: string) => string;
@@ -43,11 +45,19 @@ const copy: Record<Language, Copy> = {
   fi: {
     hi: (name) => `Hei ${name}!`,
     closed: 'suljettu',
-    dayIs: (name, day) => `${name} on ${day}`,
+    headline: (name, day) => `*Vahvista aukioloaikasi: ${name} ${day}*`,
     googleShows: (hours) => `Google näyttää nyt ${hours}.`,
-    weSuggest: (day, hours) => `Ehdotamme: *${day} ${hours}*`,
+    weSuggest: (hours) => `Ehdotamme: *${hours}*.`,
+    impact: (people) =>
+      `Noin ${people} ihmisen odotetaan etsivän sinua sinä päivänä. Oikeat ajat säästävät heidät turhalta matkalta.`,
     edit: (url) => `Muokkaa tai katso perustelut: ${url}`,
-    buttons: { approve: 'Hyväksy', edit: 'Muokkaa', reject: 'Ei kiitos' },
+    buttons: {
+      confirmClosed: 'Vahvista suljettu',
+      confirmHours: 'Vahvista ajat',
+      editOpen: 'Auki – muokkaa ajat',
+      edit: 'Muokkaa aikoja',
+      dismiss: 'Ohita',
+    },
     done: (hours) => `Valmista! ${hours} on päivitetty.`,
     liveNow: (sites) => `Näkyy nyt: ${sites}.`,
     liveSoon: (sites, when) => `${sites}: ${when} kuluessa.`,
@@ -79,11 +89,19 @@ const copy: Record<Language, Copy> = {
   sv: {
     hi: (name) => `Hej ${name}!`,
     closed: 'stängt',
-    dayIs: (name, day) => `${name} är ${day}`,
+    headline: (name, day) => `*Bekräfta era öppettider: ${name} ${day}*`,
     googleShows: (hours) => `Google visar nu ${hours}.`,
-    weSuggest: (day, hours) => `Vi föreslår: *${day} ${hours}*`,
+    weSuggest: (hours) => `Vi föreslår: *${hours}*.`,
+    impact: (people) =>
+      `Omkring ${people} personer väntas söka efter er den dagen. Rätt tider sparar dem en onödig resa.`,
     edit: (url) => `Ändra eller se varför: ${url}`,
-    buttons: { approve: 'Godkänn', edit: 'Ändra', reject: 'Nej tack' },
+    buttons: {
+      confirmClosed: 'Bekräfta stängt',
+      confirmHours: 'Bekräfta tiderna',
+      editOpen: 'Öppet – ändra tider',
+      edit: 'Ändra tider',
+      dismiss: 'Hoppa över',
+    },
     done: (hours) => `Klart! ${hours} är uppdaterat.`,
     liveNow: (sites) => `Syns nu på ${sites}.`,
     liveSoon: (sites, when) => `${sites}: inom ${when}.`,
@@ -112,11 +130,19 @@ const copy: Record<Language, Copy> = {
   nb: {
     hi: (name) => `Hei ${name}!`,
     closed: 'stengt',
-    dayIs: (name, day) => `${name} er ${day}`,
+    headline: (name, day) => `*Bekreft åpningstidene deres: ${name} ${day}*`,
     googleShows: (hours) => `Google viser nå ${hours}.`,
-    weSuggest: (day, hours) => `Vi foreslår: *${day} ${hours}*`,
+    weSuggest: (hours) => `Vi foreslår: *${hours}*.`,
+    impact: (people) =>
+      `Rundt ${people} personer ventes å søke etter dere den dagen. Riktige tider sparer dem en unødvendig tur.`,
     edit: (url) => `Endre eller se hvorfor: ${url}`,
-    buttons: { approve: 'Godkjenn', edit: 'Endre', reject: 'Nei takk' },
+    buttons: {
+      confirmClosed: 'Bekreft stengt',
+      confirmHours: 'Bekreft tidene',
+      editOpen: 'Åpent – endre tider',
+      edit: 'Endre tider',
+      dismiss: 'Hopp over',
+    },
     done: (hours) => `Ferdig! ${hours} er oppdatert.`,
     liveNow: (sites) => `Vises nå på ${sites}.`,
     liveSoon: (sites, when) => `${sites}: innen ${when}.`,
@@ -146,11 +172,19 @@ const copy: Record<Language, Copy> = {
   en: {
     hi: (name) => `Hi ${name}!`,
     closed: 'closed',
-    dayIs: (name, day) => `${name} is on ${day}`,
+    headline: (name, day) => `*Confirm your ${name} hours (${day})*`,
     googleShows: (hours) => `Google now shows ${hours}.`,
-    weSuggest: (day, hours) => `We suggest: *${day} ${hours}*`,
+    weSuggest: (hours) => `We suggest: *${hours}*.`,
+    impact: (people) =>
+      `About ${people} people are expected to look you up that day. Keep your hours right so nobody makes a wasted trip.`,
     edit: (url) => `Edit or see why: ${url}`,
-    buttons: { approve: 'Approve', edit: 'Edit', reject: 'No thanks' },
+    buttons: {
+      confirmClosed: 'Confirm closed',
+      confirmHours: 'Confirm hours',
+      editOpen: "We're open – edit",
+      edit: 'Edit hours',
+      dismiss: 'Dismiss',
+    },
     done: (hours) => `Done! ${hours} is updated.`,
     liveNow: (sites) => `Live now on ${sites}.`,
     liveSoon: (sites, when) => `${sites}: within ${when}.`,
@@ -218,27 +252,37 @@ export type SuggestionMessageInput = {
   date: string;
   shown: string;
   suggested: string;
+  /** People expected to look the business up that day. */
+  views: number;
   reasons: string[];
   url: string;
   language: Language;
 };
 
-/** The first contact about one suggestion. */
+/** The first contact about one suggestion: the question first, then what's at stake, then one reason. */
 export function suggestionMessage(m: SuggestionMessageInput): string {
   const c = copy[m.language];
-  const day = localDay(m.date, m.language);
-  const reasons = m.reasons
-    .map((reason) => translateReason(reason, m.language))
-    .filter((reason): reason is string => !!reason)
-    .slice(0, 2);
+  const people = Math.round(m.views);
+  const reason = m.reasons.map((r) => translateReason(r, m.language)).find((r): r is string => !!r);
+  const lines = [
+    `${c.hi(m.owner)} ${c.headline(m.dayName, localDay(m.date, m.language))}`,
+    `${c.weSuggest(localHours(m.suggested, m.language))} ${c.googleShows(localHours(m.shown, m.language))}`,
+  ];
+  if (people >= 2) lines.push(c.impact(people));
+  if (reason) lines.push('', reason);
+  lines.push('', c.edit(m.url));
+  return lines.join('\n');
+}
+
+/** Reply buttons for a suggestion, in the owner's language. Ids carry the action and the link's token. */
+export function suggestionButtons(suggested: string, token: string, language: Language) {
+  const b = copy[language].buttons;
+  const closed = suggested === 'closed';
   return [
-    `${c.hi(m.owner)} ${c.dayIs(m.dayName, day)} ${c.googleShows(localHours(m.shown, m.language))}`,
-    ...reasons,
-    '',
-    c.weSuggest(day, localHours(m.suggested, m.language)),
-    '',
-    c.edit(m.url),
-  ].join('\n');
+    { id: `approve:${token}`, title: closed ? b.confirmClosed : b.confirmHours },
+    { id: `edit:${token}`, title: closed ? b.editOpen : b.edit },
+    { id: `reject:${token}`, title: b.dismiss },
+  ];
 }
 
 type Site = { name: string; seconds: number };

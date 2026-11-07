@@ -13,11 +13,6 @@ const nav = [
   { label: 'Integrations', icon: PlugIcon },
 ];
 
-const reasons = [
-  'Based on what you entered for this day in previous years',
-  '38% of similar businesses nearby close',
-];
-
 const live = ['Google', 'Apple Maps', 'Bing', 'Facebook', 'Tripadvisor'];
 
 export function ProductPreview() {
@@ -57,8 +52,9 @@ export function ProductPreview() {
 
             <div class="flex flex-col gap-3 rounded-box border border-base-300 p-4">
               <div class="flex items-start justify-between gap-3">
-                <div class="text-sm font-semibold">
-                  Sat 31 Oct <span class="font-normal text-base-content/60">· All Saints’ Day</span>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold">Confirm your All Saints’ Day hours</div>
+                  <div class="text-xs text-base-content/60">Sat 31 Oct</div>
                 </div>
                 {/* Waiting until the owner replies on the phone, then Published. */}
                 <span class="relative shrink-0">
@@ -68,18 +64,21 @@ export function ProductPreview() {
                   </span>
                 </span>
               </div>
-              <div class="flex items-baseline gap-2 tabular-nums">
-                <span class="text-xs text-base-content/50 line-through">09:00–18:00</span>
+              <div class="flex items-baseline gap-2 rounded-box bg-base-200 px-3 py-2 tabular-nums">
+                <span class="text-xs text-base-content/60">We suggest</span>
                 <span class="font-semibold">10:00–15:00</span>
+                <span class="text-xs text-base-content/50">· Google shows 09:00–18:00</span>
               </div>
-              <ul class="flex flex-col gap-1 text-xs text-base-content/70">
-                <For each={reasons}>{(reason) => <li class="truncate">{reason}</li>}</For>
-              </ul>
+              <p class="text-xs">
+                <strong>~40 people</strong> are expected to look you up that day. Keep your hours right so
+                nobody makes a wasted trip.
+              </p>
               <div class="flex flex-wrap gap-2">
-                <span class="btn btn-sm btn-primary">Approve</span>
-                <span class="btn btn-ghost btn-sm border-base-300">Edit</span>
-                <span class="btn btn-ghost btn-sm">No thanks</span>
+                <span class="btn btn-sm btn-primary">Confirm 10:00–15:00</span>
+                <span class="btn btn-ghost btn-sm border-base-300">Different hours (edit)</span>
+                <span class="btn btn-ghost btn-sm">Dismiss</span>
               </div>
+              <div class="text-xs text-base-content/50">▸ Why we suggest this</div>
             </div>
 
             <div class="flex items-center gap-2 text-xs text-base-content/50">
@@ -103,16 +102,15 @@ export function ProductPreview() {
               </div>
               <div class="flex flex-1 flex-col gap-2 p-2.5 text-[11px] leading-snug text-[#111b21]">
                 <Bubble class="animate-hero-msg">
-                  <b>🕯️ Kahvila Aurora</b>
+                  Hi Mika! <b>Confirm your All Saints’ Day hours (Sat 31.10.)</b>
                   <br />
-                  Hi Mika! All Saints’ Day is on Sat 31 Oct. Last year you were open 10–15, but Google now
-                  shows 9–18.
+                  We suggest: <b>10–15</b>. Google now shows 9–18.
                   <br />
-                  Suggested: <b>Sat 31 Oct 10–15</b>
+                  About 40 people are expected to look you up that day.
                   <span class="mt-1.5 grid grid-cols-3 gap-1 border-t border-black/10 pt-1.5 text-center font-medium text-[#027eb5]">
-                    <span>Approve</span>
-                    <span>Edit</span>
-                    <span>No thanks</span>
+                    <span>Confirm hours</span>
+                    <span>Edit hours</span>
+                    <span>Dismiss</span>
                   </span>
                 </Bubble>
                 <Bubble class="animate-hero-reply self-end bg-[#d9fdd3]">Kyllä 👍</Bubble>

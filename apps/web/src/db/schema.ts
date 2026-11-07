@@ -131,6 +131,8 @@ export const job = sqliteTable(
 const countries = ['FI', 'SE', 'NO'] as const;
 export const languages = ['fi', 'sv', 'nb', 'en'] as const;
 export type Language = (typeof languages)[number];
+/** How pressing a suggestion is. See `importanceLabel`. */
+export const importances = ['low', 'medium', 'high'] as const;
 const contactChannels = ['EMAIL', 'SMS', 'WHATSAPP', 'APP_PUSH'] as const;
 const entitySplits = ['dev', 'test', 'demo', 'reference'] as const;
 const cityTiers = ['capital', 'large_city', 'town', 'ski_resort'] as const;
@@ -571,6 +573,8 @@ export const businessProfile = sqliteTable('business_profile', {
   whatsappPhone: text('whatsapp_phone'),
   whatsappLanguage: text('whatsapp_language', { enum: languages }).notNull().default('en'),
   whatsappOn: integer('whatsapp_on', { mode: 'boolean' }).notNull().default(false),
+  // The least important suggestion that goes out on WhatsApp. Lower ones wait on the dashboard.
+  whatsappMinImportance: text('whatsapp_min_importance', { enum: importances }).notNull().default('low'),
   // "Handle public holidays from now on without asking."
   standingPermission: integer('standing_permission', { mode: 'boolean' }).notNull().default(false),
   // WhatsApp only allows free-form messages within 24 hours of the owner's last message.

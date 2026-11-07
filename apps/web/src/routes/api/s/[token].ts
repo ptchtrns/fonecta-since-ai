@@ -15,6 +15,7 @@ export async function GET(event: ApiEvent) {
 
   const { state, business } = found;
   const { pending } = await listSuggestions(business);
+  const item = pending.find((p) => p.key === state.suggestionKey);
   return json({
     data: {
       business: { name: business.name, owner: business.owner },
@@ -22,7 +23,9 @@ export async function GET(event: ApiEvent) {
       status: state.status,
       hours: state.hours,
       snapshot: state.snapshot,
-      open: state.status !== 'pending' || pending.some((p) => p.key === state.suggestionKey),
+      open: state.status !== 'pending' || !!item,
+      // How many people are expected to look the business up that day, for the impact line.
+      views: item?.views ?? null,
       // Only what really went out: without a Yext connection a decision is saved, not published.
       sites: state.publishedAt ? await liveSites(business.id) : null,
     },

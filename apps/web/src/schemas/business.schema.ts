@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { languages, sourceKinds } from '~/db/schema';
+import { importances, languages, sourceKinds } from '~/db/schema';
 import { HOURS_TEXT, WEEKDAYS, type Weekday } from '~/lib/hours';
 
 const entityId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, { message: 'Choose your business from the list' });
@@ -50,6 +50,7 @@ export const whatsappSchema = z
       .regex(/^(\+[0-9 ]{7,20})?$/, { message: 'WhatsApp number with country code, e.g. +358 40 123 4567' }),
     language: z.enum(languages),
     on: z.boolean(),
+    minImportance: z.enum(importances),
     standingPermission: z.boolean(),
   })
   .refine((w) => !w.on || w.phone.length > 0, {

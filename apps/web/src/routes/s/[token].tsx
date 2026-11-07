@@ -8,6 +8,7 @@ import { apiSend } from '~/lib/api';
 import { createFormState } from '~/lib/form';
 import { formatDay, formatHours } from '~/lib/hours';
 import { updateTime } from '~/lib/messages';
+import { answerLabels, expectedLookups, impactRest, suggestionHeadline } from '~/lib/suggestion-copy';
 import { getOwnerSuggestion } from '~/queries/workspace';
 
 export const route = {
@@ -23,6 +24,7 @@ export default function OwnerAnswer() {
 
   const s = () => view().snapshot;
   const answered = () => view().status !== 'pending';
+  const labels = () => answerLabels(s().suggested);
 
   function send(action: 'approve' | 'edit' | 'decline') {
     return form.submit(
@@ -64,27 +66,32 @@ export default function OwnerAnswer() {
 
             <section class="card card-border border-base-300 bg-base-100">
               <div class="card-body gap-4 p-5">
-                <h2 class="text-xl font-semibold text-balance">
-                  {formatDay(view().date)} · {s().label}
-                </h2>
+                <div>
+                  <h2 class="text-xl font-semibold text-balance">{suggestionHeadline(s().label)}</h2>
+                  <p class="text-sm text-base-content/60">{formatDay(view().date)}</p>
+                </div>
 
                 <Show
                   when={edit() !== null}
                   fallback={
-                    <dl class="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-1">
-                      <dt class="text-sm text-base-content/60">Google shows</dt>
-                      <dd class="text-base-content/60 line-through">{formatHours(s().shown)}</dd>
+                    <dl class="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-1 rounded-box bg-base-200 px-4 py-3">
                       <dt class="text-sm text-base-content/60">We suggest</dt>
                       <dd class="text-lg font-semibold">{formatHours(s().suggested ?? '')}</dd>
+                      <dt class="text-sm text-base-content/60">Google shows</dt>
+                      <dd class="text-sm text-base-content/60">{formatHours(s().shown)}</dd>
                     </dl>
                   }
                 >
                   <HoursInput label="Your hours" value={edit()!} onChange={setEdit} />
                 </Show>
 
-                <ul class="flex flex-col gap-1 text-sm text-base-content/70">
-                  <For each={s().reasons}>{(reason) => <li>{reason}</li>}</For>
-                </ul>
+                <Show when={expectedLookups(view().views)}>
+                  {(people) => (
+                    <p>
+                      <strong>{people()}</strong> {impactRest(view().views!)}
+                    </p>
+                  )}
+                </Show>
 
                 <FormMessage message={form.message()} />
 
@@ -94,46 +101,56 @@ export default function OwnerAnswer() {
                     <div class="flex flex-col gap-2">
                       <button
                         type="button"
-                        class="btn btn-primary btn-lg"
+                        class="btn btn-primary btn-lg font-semibold"
                         disabled={form.pending()}
                         onClick={() => send('approve')}
                       >
-                        Approve
+                        {labels().confirm}
                       </button>
-                      <div class="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          class="btn"
-                          disabled={form.pending()}
-                          onClick={() => setEdit(s().suggested)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-ghost"
-                          disabled={form.pending()}
-                          onClick={() => send('decline')}
-                        >
-                          No thanks
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        class="btn font-semibold"
+                        disabled={form.pending()}
+                        onClick={() => setEdit(s().suggested)}
+                      >
+                        {labels().edit}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost"
+                        disabled={form.pending()}
+                        onClick={() => send('decline')}
+                      >
+                        {labels().dismiss}
+                      </button>
+                      <p class="text-center text-xs text-base-content/50">{labels().dismissHint}.</p>
                     </div>
                   }
                 >
                   <div class="flex flex-col gap-2">
                     <button
                       type="button"
-                      class="btn btn-primary btn-lg"
+                      class="btn btn-primary btn-lg font-semibold"
                       disabled={form.pending()}
                       onClick={() => send('edit')}
                     >
-                      Approve my hours
+                      {labels().save}
                     </button>
                     <button type="button" class="btn btn-ghost" onClick={() => setEdit(null)}>
                       Back
                     </button>
                   </div>
+                </Show>
+
+                <Show when={s().reasons.length}>
+                  <details class="text-sm text-base-content/70">
+                    <summary class="cursor-pointer text-base-content/50 select-none">
+                      Why we suggest this
+                    </summary>
+                    <ul class="mt-2 flex list-disc flex-col gap-1 pl-5">
+                      <For each={s().reasons}>{(reason) => <li>{reason}</li>}</For>
+                    </ul>
+                  </details>
                 </Show>
               </div>
             </section>

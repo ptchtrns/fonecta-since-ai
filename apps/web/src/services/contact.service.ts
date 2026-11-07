@@ -1,7 +1,15 @@
 import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import { businessProfile, suggestionState, user } from '~/db/schema';
-import { confirmationMessage, localDay, localHours, suggestionMessage, t } from '~/lib/messages';
+import {
+  confirmationMessage,
+  localDay,
+  localHours,
+  suggestionButtons,
+  suggestionMessage,
+  t,
+} from '~/lib/messages';
+import { meetsImportance, type Importance } from '~/lib/importance';
 import { err, ok } from '~/lib/result';
 import type { WhatsAppPayload } from '~/schemas/business.schema';
 import { db } from '~/server/db';
@@ -20,9 +28,15 @@ const STANDING_MIN_CONFIDENCE = 0.7;
 
 const disagrees = (item: SuggestionItem) => item.checks.some((c) => !c.agrees);
 
-/** The next suggestion to send: never a closure question, which is for a person, or one a linked page disputes. */
-const sendable = (pending: SuggestionItem[]) =>
-  pending.find((item) => item.kind === 'hours' && item.suggested && !disagrees(item));
+/**
+ * The next suggestion to send: never a closure question, which is for a person, one a linked page disputes, or one
+ * below the owner's level. `pending` is most important first.
+ */
+export const sendable = (pending: SuggestionItem[], min: Importance) =>
+  pending.find(
+    (item) =>
+      item.kind === 'hours' && item.suggested && !disagrees(item) && meetsImportance(item.importance, min),
+  );
 
 export function suggestionUrl(origin: string, token: string) {
   return `${origin}/s/${token}`;
@@ -33,7 +47,6 @@ export async function buildMessage(business: Business, item: SuggestionItem, ori
   const state = await ensureState(business.id, item);
   const language = business.whatsapp.language;
   const url = suggestionUrl(origin, state.token);
-  const c = t(language);
   return {
     state,
     url,
@@ -43,15 +56,12 @@ export async function buildMessage(business: Business, item: SuggestionItem, ori
       date: item.date!,
       shown: item.shown,
       suggested: item.suggested!,
+      views: item.views,
       reasons: item.reasons,
       url,
       language,
     }),
-    buttons: [
-      { id: `approve:${state.token}`, title: c.buttons.approve },
-      { id: `edit:${state.token}`, title: c.buttons.edit },
-      { id: `reject:${state.token}`, title: c.buttons.reject },
-    ],
+    buttons: suggestionButtons(item.suggested!, state.token, language),
   };
 }
 
@@ -65,7 +75,7 @@ export async function sendNext(business: Business, origin: string) {
 
   const { pending } = await listSuggestions(business);
   if (pending.some((item) => item.sentAt)) return ok({ sent: false });
-  const next = sendable(pending);
+  const next = sendable(pending, business.whatsapp.minImportance);
   if (!next) return ok({ sent: false });
 
   const message = await buildMessage(business, next, origin);
@@ -132,6 +142,7 @@ export async function saveWhatsApp(entityId: string, input: WhatsAppPayload, ori
       whatsappPhone: phone || null,
       whatsappLanguage: input.language,
       whatsappOn: input.on,
+      whatsappMinImportance: input.minImportance,
       standingPermission: input.standingPermission,
     })
     .where(eq(businessProfile.entityId, entityId));

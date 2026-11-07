@@ -152,8 +152,15 @@ export async function listSuggestions(business: Business) {
     const status = stateByKey.get(r.action === 'FLAG' ? FLAG_KEY : r.date)?.status;
     return !status || status === 'pending';
   });
-  const views = await viewsByDate(business, pendingRows);
+  // Views for answered days too: they count towards what "most important" means, see `top` below.
+  const views = await viewsByDate(business, rows);
   const now = today();
+  const scoreOf = (r: Row) =>
+    importanceScore({
+      confidence: r.confidence ?? 0,
+      views: views.get(r.date) ?? 0,
+      daysUntil: daysBetween(now, r.date),
+    });
 
   // The predictor flags a shut-down business on every date. To the owner that's one question.
   const flagged = pendingRows.find((r) => r.action === 'FLAG');
@@ -181,30 +188,28 @@ export async function listSuggestions(business: Business) {
 
   const items = pendingRows
     .filter((r) => r.action === 'SUGGEST')
-    .map((r) => {
-      const confidence = r.confidence ?? 0;
-      const dayViews = views.get(r.date) ?? 0;
-      return {
-        key: r.date,
-        kind: 'hours' as const,
-        date: r.date,
-        label: labelOf(r),
-        dayNames: dayNamesOf(r),
-        shown: r.shown,
-        suggested: r.hours,
-        confidence,
-        reasons: r.reasons,
-        views: dayViews,
-        score: importanceScore({ confidence, views: dayViews, daysUntil: daysBetween(now, r.date) }),
-        publicHoliday: r.dayType === 'PUBLIC_HOLIDAY' || r.dayType === 'EVE',
-        checks: sources.flatMap((source) => {
-          const hours = source.findings[r.date];
-          return hours ? [{ kind: source.kind, hours, agrees: hours === r.hours }] : [];
-        }),
-        sentAt: stateByKey.get(r.date)?.sentAt ?? null,
-      };
-    });
-  const top = Math.max(0, ...items.map((i) => i.score));
+    .map((r) => ({
+      key: r.date,
+      kind: 'hours' as const,
+      date: r.date,
+      label: labelOf(r),
+      dayNames: dayNamesOf(r),
+      shown: r.shown,
+      suggested: r.hours,
+      confidence: r.confidence ?? 0,
+      reasons: r.reasons,
+      views: views.get(r.date) ?? 0,
+      score: scoreOf(r),
+      publicHoliday: r.dayType === 'PUBLIC_HOLIDAY' || r.dayType === 'EVE',
+      checks: sources.flatMap((source) => {
+        const hours = source.findings[r.date];
+        return hours ? [{ kind: source.kind, hours, agrees: hours === r.hours }] : [];
+      }),
+      sentAt: stateByKey.get(r.date)?.sentAt ?? null,
+    }));
+  // Levels compare with the top upcoming suggestion, answered ones included. Otherwise answering the top one would
+  // promote the next, and an owner who only wants High suggestions would in the end be sent all of them.
+  const top = Math.max(0, ...rows.filter((r) => r.action === 'SUGGEST').map(scoreOf));
   const ranked: SuggestionItem[] = items
     .map((i) => ({ ...i, importance: importanceLabel(i.score, top) }))
     .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));

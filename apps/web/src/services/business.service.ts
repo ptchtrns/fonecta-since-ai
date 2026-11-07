@@ -144,6 +144,7 @@ export async function getBusiness(entityId: string) {
       phone: row.profile?.whatsappPhone ?? '',
       language: row.profile?.whatsappLanguage ?? 'en',
       on: row.profile?.whatsappOn ?? false,
+      minImportance: row.profile?.whatsappMinImportance ?? 'low',
       standingPermission: row.profile?.standingPermission ?? false,
       lastInboundAt: row.profile?.lastInboundAt ?? null,
     },

@@ -21,6 +21,7 @@ export type OwnerSuggestion = {
     reasons: string[];
   };
   open: boolean;
+  views: number | null;
   sites: { name: string; seconds: number }[] | null;
 };
 

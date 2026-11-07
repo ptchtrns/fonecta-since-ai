@@ -4,6 +4,7 @@ import { FormMessage } from '~/components/FormMessage';
 import { apiSend } from '~/lib/api';
 import { createFormState } from '~/lib/form';
 import { formatDay, formatHours } from '~/lib/hours';
+import { answerLabels, expectedLookups, impactRest, suggestionHeadline } from '~/lib/suggestion-copy';
 import { getWorkspace, type SuggestionItem } from '~/queries/workspace';
 import { HoursInput } from './HoursInput';
 
@@ -16,12 +17,14 @@ export const sourceNames: Record<string, string> = {
   other: 'Your linked page',
 };
 
-/** One suggested change: the day, the change, why, and one tap to answer. */
+/** One suggested change: a question, what's at stake for customers, and one tap to answer. The why is folded away. */
 export function SuggestionCard(props: { suggestion: SuggestionItem; onAnswered: (message: string) => void }) {
   const s = () => props.suggestion;
   const form = createFormState();
   const [edit, setEdit] = createSignal<string | null>(null);
   const closure = () => s().kind === 'closure';
+  const labels = () => answerLabels(s().suggested);
+  const lookups = () => expectedLookups(s().views);
   const disputes = () => s().checks.filter((c) => !c.agrees);
   const confirmations = () => s().checks.filter((c) => c.agrees);
 
@@ -43,16 +46,12 @@ export function SuggestionCard(props: { suggestion: SuggestionItem; onAnswered: 
       <div class="card-body gap-3">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <h3 class="font-semibold text-balance">
-              <Show when={s().date} fallback={s().label}>
-                {(date) => (
-                  <>
-                    {formatDay(date())}
-                    <span class="font-normal text-base-content/60"> · {s().label}</span>
-                  </>
-                )}
-              </Show>
+            <h3 class="text-lg font-semibold text-balance">
+              {closure() ? s().label : suggestionHeadline(s().label)}
             </h3>
+            <Show when={s().date}>
+              {(date) => <p class="text-sm text-base-content/60">{formatDay(date())}</p>}
+            </Show>
           </div>
           <span class="flex shrink-0 items-center gap-1">
             <Show when={s().sentAt}>
@@ -71,19 +70,25 @@ export function SuggestionCard(props: { suggestion: SuggestionItem; onAnswered: 
           <Show
             when={edit() !== null}
             fallback={
-              <p class="flex flex-wrap items-baseline gap-x-2 tabular-nums">
-                <span class="text-sm text-base-content/50 line-through">{formatHours(s().shown)}</span>
-                <span class="text-lg font-semibold">{formatHours(s().suggested ?? '')}</span>
-              </p>
+              <dl class="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-0.5 rounded-box bg-base-200 px-4 py-3 tabular-nums">
+                <dt class="text-sm text-base-content/60">We suggest</dt>
+                <dd class="text-lg font-semibold">{formatHours(s().suggested ?? '')}</dd>
+                <dt class="text-sm text-base-content/60">Google shows</dt>
+                <dd class="text-sm text-base-content/60">{formatHours(s().shown)}</dd>
+              </dl>
             }
           >
             <HoursInput label="Your hours" value={edit()!} onChange={setEdit} />
           </Show>
         </Show>
 
-        <ul class="flex flex-col gap-0.5 text-sm text-base-content/70">
-          <For each={s().reasons}>{(reason) => <li>{reason}</li>}</For>
-        </ul>
+        <Show when={lookups()}>
+          {(people) => (
+            <p class="text-sm">
+              <strong>{people()}</strong> {impactRest(s().views)}
+            </p>
+          )}
+        </Show>
 
         <Show when={disputes().length}>
           <div role="alert" class="alert alert-warning alert-soft py-2 text-sm">
@@ -103,13 +108,6 @@ export function SuggestionCard(props: { suggestion: SuggestionItem; onAnswered: 
               .map((c) => sourceNames[c.kind])
               .join(', ')}{' '}
             agrees
-          </p>
-        </Show>
-
-        <Show when={!closure()}>
-          <p class="text-xs text-base-content/50">
-            {Math.round((s().confidence ?? 0) * 100)}% sure · about {s().views} Google views on a day like
-            this
           </p>
         </Show>
 
@@ -145,38 +143,39 @@ export function SuggestionCard(props: { suggestion: SuggestionItem; onAnswered: 
                 <>
                   <button
                     type="button"
-                    class="btn btn-sm btn-primary"
+                    class="btn btn-sm btn-primary font-semibold"
                     disabled={form.pending()}
                     onClick={() => respond('approve')}
                   >
-                    Approve
+                    {labels().confirm}
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost border-base-300"
+                    class="btn btn-sm btn-ghost border-base-300 font-semibold"
                     disabled={form.pending()}
                     onClick={() => setEdit(s().suggested)}
                   >
-                    Edit
+                    {labels().edit}
                   </button>
                   <button
                     type="button"
                     class="btn btn-sm btn-ghost"
+                    title={labels().dismissHint}
                     disabled={form.pending()}
                     onClick={() => respond('decline')}
                   >
-                    No thanks
+                    {labels().dismiss}
                   </button>
                 </>
               }
             >
               <button
                 type="button"
-                class="btn btn-sm btn-primary"
+                class="btn btn-sm btn-primary font-semibold"
                 disabled={form.pending()}
                 onClick={() => respond('edit')}
               >
-                Approve my hours
+                {labels().save}
               </button>
               <button type="button" class="btn btn-sm btn-ghost" onClick={() => setEdit(null)}>
                 Cancel
@@ -184,6 +183,23 @@ export function SuggestionCard(props: { suggestion: SuggestionItem; onAnswered: 
             </Show>
           </Show>
         </div>
+
+        <Show when={s().reasons.length || !closure()}>
+          <details class="text-sm text-base-content/70">
+            <summary class="cursor-pointer text-xs text-base-content/50 select-none">
+              Why we suggest this
+            </summary>
+            <ul class="mt-2 flex list-disc flex-col gap-0.5 pl-5">
+              <For each={s().reasons}>{(reason) => <li>{reason}</li>}</For>
+            </ul>
+            <Show when={!closure()}>
+              <p class="mt-2 text-xs text-base-content/50">
+                {Math.round((s().confidence ?? 0) * 100)}% sure · {s().views} Google views on a day like this
+                last year
+              </p>
+            </Show>
+          </details>
+        </Show>
       </div>
     </article>
   );

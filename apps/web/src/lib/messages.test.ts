@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vite-plus/test';
-import { confirmationMessage, suggestionMessage, translateReason } from '~/lib/messages';
-import { importanceLabel, importanceScore } from '~/lib/importance';
+import { confirmationMessage, suggestionButtons, suggestionMessage, translateReason } from '~/lib/messages';
+import { importanceLabel, importanceScore, meetsImportance } from '~/lib/importance';
 import { groupWeek } from '~/lib/hours';
 
 const reasons = [
@@ -36,21 +36,50 @@ describe('translateReason', () => {
 });
 
 describe('suggestionMessage', () => {
-  test("states the day, what Google shows, the reason and the suggestion, like the brief's example", () => {
-    const body = suggestionMessage({
-      owner: 'Aleksi',
-      dayName: 'Jouluaatto',
-      date: '2026-12-24',
-      shown: '07:30-18:00',
-      suggested: '07:30-13:00',
-      reasons: [reasons[0]!],
-      url: 'https://x/s/abc',
-      language: 'fi',
-    });
-    expect(body).toContain('Hei Aleksi! Jouluaatto on to 24.12. Google näyttää nyt 07:30–18:00.');
+  const input = {
+    owner: 'Aleksi',
+    dayName: 'Jouluaatto',
+    date: '2026-12-24',
+    shown: '07:30-18:00',
+    suggested: '07:30-13:00',
+    views: 18,
+    reasons: [reasons[0]!, reasons[1]!],
+    url: 'https://x/s/abc',
+    language: 'fi' as const,
+  };
+  test('leads with the question, then the suggestion, the customer impact and one reason', () => {
+    const body = suggestionMessage(input);
+    const lines = body.split('\n');
+    expect(lines[0]).toBe('Hei Aleksi! *Vahvista aukioloaikasi: Jouluaatto to 24.12.*');
+    expect(lines[1]).toBe('Ehdotamme: *07:30–13:00*. Google näyttää nyt 07:30–18:00.');
+    expect(lines[2]).toContain('Noin 18 ihmisen');
     expect(body).toContain('Perustuu aiempina vuosina');
-    expect(body).toContain('*to 24.12. 07:30–13:00*');
+    expect(body).not.toContain('39%');
     expect(body).toContain('https://x/s/abc');
+  });
+  test('leaves the impact out when almost nobody looks the business up', () => {
+    expect(suggestionMessage({ ...input, views: 1, language: 'en' })).not.toContain('expected to look');
+  });
+});
+
+describe('suggestionButtons', () => {
+  test('say what happens, and fit WhatsApp in every language', () => {
+    for (const language of ['fi', 'sv', 'nb', 'en'] as const) {
+      for (const suggested of ['closed', '10:00-14:00']) {
+        for (const b of suggestionButtons(suggested, 't', language))
+          expect(b.title.length).toBeLessThanOrEqual(20);
+      }
+    }
+    expect(suggestionButtons('closed', 't', 'en').map((b) => b.title)).toEqual([
+      'Confirm closed',
+      "We're open – edit",
+      'Dismiss',
+    ]);
+    expect(suggestionButtons('closed', 't', 'en').map((b) => b.id)).toEqual([
+      'approve:t',
+      'edit:t',
+      'reject:t',
+    ]);
   });
 });
 
@@ -87,6 +116,13 @@ describe('importance', () => {
     expect(importanceLabel(100, 100)).toBe('high');
     expect(importanceLabel(50, 100)).toBe('medium');
     expect(importanceLabel(10, 100)).toBe('low');
+  });
+  test("the owner's WhatsApp level lets that level and higher through", () => {
+    expect(meetsImportance('high', 'medium')).toBe(true);
+    expect(meetsImportance('medium', 'medium')).toBe(true);
+    expect(meetsImportance('low', 'medium')).toBe(false);
+    expect(meetsImportance('low', 'low')).toBe(true);
+    expect(meetsImportance('medium', 'high')).toBe(false);
   });
 });
 

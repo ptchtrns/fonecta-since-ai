@@ -36,7 +36,7 @@ export function FeatureBento() {
           <Cell
             class="lg:col-span-2 lg:border-r"
             title="Approve on WhatsApp"
-            text="Owners tap Approve, Edit or No thanks, in Finnish, Swedish, Norwegian or English. One message at a time, most important first."
+            text="Owners tap Confirm, Edit hours or Dismiss, in Finnish, Swedish, Norwegian or English. One message at a time, most important first."
           >
             <ChatDiagram />
           </Cell>
@@ -234,9 +234,9 @@ function ReportsDiagram() {
             <span class="font-mono text-[10px] text-base-content/60">92% sure</span>
           </div>
           <div class="flex gap-1.5">
-            <span class="btn btn-xs btn-neutral">Approve</span>
-            <span class="btn btn-ghost btn-xs border-base-300">Edit</span>
-            <span class="btn btn-ghost btn-xs">No thanks</span>
+            <span class="btn btn-xs btn-neutral">Confirm 10–15</span>
+            <span class="btn btn-ghost btn-xs border-base-300">Edit hours</span>
+            <span class="btn btn-ghost btn-xs">Dismiss</span>
           </div>
         </div>
       </div>
@@ -256,11 +256,13 @@ function ChatDiagram() {
       </div>
       <div class="chat chat-start animate-bubble">
         <div class="chat-bubble bg-base-300 text-[13px]">
-          Hi Kahvila Aurora! All Saints’ Day is Sat 31 Oct. Last year you were open 10–15. Suggested: 10–15
+          <b>Confirm your All Saints’ Day hours (Sat 31 Oct)</b>
+          <br />
+          We suggest 10–15. ~40 people are expected to look you up that day.
           <div class="mt-1.5 flex gap-1">
-            <span class="rounded bg-base-100 px-1.5 py-0.5 text-[11px]">Approve</span>
-            <span class="rounded bg-base-100 px-1.5 py-0.5 text-[11px]">Edit</span>
-            <span class="rounded bg-base-100 px-1.5 py-0.5 text-[11px]">No thanks</span>
+            <span class="rounded bg-base-100 px-1.5 py-0.5 text-[11px]">Confirm hours</span>
+            <span class="rounded bg-base-100 px-1.5 py-0.5 text-[11px]">Edit hours</span>
+            <span class="rounded bg-base-100 px-1.5 py-0.5 text-[11px]">Dismiss</span>
           </div>
         </div>
       </div>

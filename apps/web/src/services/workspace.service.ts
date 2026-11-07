@@ -3,7 +3,7 @@ import { weekToText } from '~/lib/hours';
 import { whatsappEnabled } from '~/server/whatsapp';
 import { yextEnabled } from '~/server/yext';
 import { getBusiness } from '~/services/business.service';
-import { buildMessage } from '~/services/contact.service';
+import { buildMessage, sendable } from '~/services/contact.service';
 import { builtInSources, listLinkedSources } from '~/services/sources.service';
 import { listSuggestions, upcomingExceptions } from '~/services/suggestions.service';
 
@@ -20,7 +20,7 @@ export async function getWorkspace(entityId: string, origin: string) {
   ]);
 
   // The message the owner would get next, to show on the Integrations page.
-  const next = suggestions.pending.find((p) => p.kind === 'hours' && !p.checks.some((c) => !c.agrees));
+  const next = sendable(suggestions.pending, business.whatsapp.minImportance);
   const message = next ? await buildMessage(business, next, origin) : null;
 
   return {
@@ -53,6 +53,7 @@ export async function getWorkspace(entityId: string, origin: string) {
       phone: business.whatsapp.phone,
       language: business.whatsapp.language,
       on: business.whatsapp.on,
+      minImportance: business.whatsapp.minImportance,
       standingPermission: business.whatsapp.standingPermission,
       preview: message && {
         body: message.body,
