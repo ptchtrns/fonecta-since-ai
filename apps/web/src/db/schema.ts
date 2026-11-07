@@ -133,7 +133,8 @@ export const languages = ['fi', 'sv', 'nb', 'en'] as const;
 export type Language = (typeof languages)[number];
 /** How pressing a suggestion is. See `importanceLabel`. */
 export const importances = ['low', 'medium', 'high'] as const;
-const contactChannels = ['EMAIL', 'SMS', 'WHATSAPP', 'APP_PUSH'] as const;
+export const contactChannels = ['EMAIL', 'SMS', 'WHATSAPP', 'APP_PUSH'] as const;
+export type ContactChannel = (typeof contactChannels)[number];
 // `yext`: a business from the team's Yext account rather than the dataset, added when someone takes it on. Not in
 // any dataset file, so a reseed removes it and the app adds it again from Yext.
 const entitySplits = ['dev', 'test', 'demo', 'reference', 'yext'] as const;
@@ -583,8 +584,25 @@ export const businessProfile = sqliteTable('business_profile', {
   standingPermission: integer('standing_permission', { mode: 'boolean' }).notNull().default(false),
   // WhatsApp only allows free-form messages within 24 hours of the owner's last message.
   lastInboundAt: integer('last_inbound_at', { mode: 'timestamp_ms' }),
+  // No messages at all. Starts from the customer record's opt-out; the owner can change it.
+  optedOut: integer('opted_out', { mode: 'boolean' }).notNull().default(false),
   ...timestamps,
 });
+
+// Messages for channels this app can't send yet (text message, email, app notification): recorded here and shown
+// to the owner, so the demo respects each owner's preferred channel.
+export const outbox = sqliteTable(
+  'outbox',
+  {
+    id: text('id').primaryKey(),
+    entityId: text('entity_id').notNull(),
+    channel: text('channel', { enum: contactChannels }).notNull(),
+    recipient: text('recipient').notNull(),
+    body: text('body').notNull(),
+    ...timestamps,
+  },
+  (t) => [index('outbox_entity_idx').on(t.entityId, t.createdAt)],
+);
 
 export const suggestionStatuses = ['pending', 'approved', 'edited', 'declined'] as const;
 export type SuggestionStatus = (typeof suggestionStatuses)[number];

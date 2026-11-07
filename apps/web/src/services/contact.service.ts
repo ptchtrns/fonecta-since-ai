@@ -1,6 +1,14 @@
 import 'server-only';
 import { and, eq } from 'drizzle-orm';
-import { businessProfile, languages, suggestionState, user, type Language } from '~/db/schema';
+import {
+  businessProfile,
+  languages,
+  outbox,
+  suggestionState,
+  user,
+  type ContactChannel,
+  type Language,
+} from '~/db/schema';
 import {
   confirmationMessage,
   localDay,
@@ -9,9 +17,10 @@ import {
   suggestionMessage,
   t,
 } from '~/lib/messages';
+import { inContactWindow } from '~/lib/contact-window';
 import { meetsImportance, type Importance } from '~/lib/importance';
 import { err, ok } from '~/lib/result';
-import type { WhatsAppPayload } from '~/schemas/business.schema';
+import type { ContactPayload, WhatsAppPayload } from '~/schemas/business.schema';
 import { db } from '~/server/db';
 import { log, maskPhone } from '~/server/log';
 import { sendTestTemplate, sendWhatsApp, whatsappEnabled } from '~/server/whatsapp';
@@ -19,10 +28,14 @@ import { ensureProfile, getBusiness, type Business } from '~/services/business.s
 import { recheckSources } from '~/services/sources.service';
 import { decide, ensureState, listSuggestions, type SuggestionItem } from '~/services/suggestions.service';
 
-// Reaching the owner: one suggestion at a time on WhatsApp, the most important first, and the next one only after
-// they've answered, so nobody gets a pile of messages. Standing permission skips the question for public holidays.
+// Reaching the owner: one suggestion at a time, the most important first, and the next one only after they've
+// answered, so nobody gets a pile of messages. Standing permission skips the question for public holidays.
+// Every message respects the owner's preferences: nothing after an opt-out, only within their contact window, and on
+// their channel. WhatsApp is sent for real; text messages, email and app notifications go to the outbox.
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
+// Linked pages are checked once a day, at this hour (UTC). Messages go out every hour, within each owner's window.
+const PAGE_CHECK_HOUR_UTC = 5;
 // Below this, or when a linked page disagrees, a suggestion waits for the owner even with standing permission.
 const STANDING_MIN_CONFIDENCE = 0.7;
 
@@ -82,10 +95,60 @@ export async function previewMessage(business: Business, item: SuggestionItem, o
 const inWindow = (business: Business) =>
   !!business.whatsapp.lastInboundAt && Date.now() - business.whatsapp.lastInboundAt.getTime() < WINDOW_MS;
 
+/** WhatsApp once the owner has turned it on here, otherwise the channel in their customer record. */
+export function channelFor(business: Business): ContactChannel {
+  return business.whatsapp.on ? 'WHATSAPP' : business.contact.channel;
+}
+
+/** Whether the owner may be messaged now: they haven't opted out, and it's within their contact window. */
+export function canContactNow(business: Business, now = new Date()) {
+  if (business.contact.optedOut) return false;
+  return inContactWindow(business.contact.window, business.contact.timeZone, now);
+}
+
+type OutgoingMessage = {
+  body: string;
+  buttons?: ReturnType<typeof suggestionButtons>;
+  startsConversation?: boolean;
+};
+
+/** Sends one message on the owner's channel. Channels this app can't send on yet go to the outbox. */
+async function deliver(business: Business, message: OutgoingMessage) {
+  const channel = channelFor(business);
+  if (channel === 'WHATSAPP') {
+    if (!whatsappEnabled()) return err({ reason: 'NotConfigured' as const });
+    if (!business.whatsapp.phone) return err({ reason: 'NoPhone' as const });
+    const result = await sendWhatsApp({
+      to: business.whatsapp.phone,
+      body: message.body,
+      language: business.whatsapp.language,
+      buttons: message.buttons,
+      startsConversation: message.startsConversation,
+    });
+    if (result.error) return err({ reason: 'SendFailed' as const, message: result.error });
+    return ok({ channel });
+  }
+
+  await db.insert(outbox).values({
+    id: crypto.randomUUID(),
+    entityId: business.id,
+    channel,
+    recipient: recipientFor(business, channel),
+    // WhatsApp shows *text* in bold; elsewhere the asterisks would show as they are.
+    body: message.body.replaceAll('*', ''),
+  });
+  return ok({ channel });
+}
+
+function recipientFor(business: Business, channel: ContactChannel) {
+  if (channel === 'EMAIL') return business.contact.email;
+  if (channel === 'SMS') return business.contact.mobile;
+  return 'Connect app';
+}
+
 /** Sends the most important waiting suggestion, unless the owner still has one to answer. */
 export async function sendNext(business: Business, origin: string) {
-  if (!whatsappEnabled()) return err({ reason: 'NotConfigured' as const });
-  if (!business.whatsapp.phone) return err({ reason: 'NoPhone' as const });
+  if (!canContactNow(business)) return ok({ sent: false });
 
   const { pending } = await listSuggestions(business);
   if (pending.some((item) => item.sentAt)) return ok({ sent: false });
@@ -93,14 +156,12 @@ export async function sendNext(business: Business, origin: string) {
   if (!next) return ok({ sent: false });
 
   const message = await buildMessage(business, next, origin);
-  const result = await sendWhatsApp({
-    to: business.whatsapp.phone,
+  const [error] = await deliver(business, {
     body: message.body,
-    language: business.whatsapp.language,
     buttons: message.buttons,
     startsConversation: !inWindow(business),
   });
-  if (result.error) return err({ reason: 'SendFailed' as const, message: result.error });
+  if (error) return err(error);
   await db
     .update(suggestionState)
     .set({ sentAt: new Date() })
@@ -129,12 +190,11 @@ export async function applyStandingPermission(business: Business) {
     }
     applied.push(`${localDay(item.date!, language)} ${localHours(item.suggested!, language)}`);
   }
-  if (applied.length && business.whatsapp.on && business.whatsapp.phone && whatsappEnabled()) {
-    await sendWhatsApp({
-      to: business.whatsapp.phone,
+  if (applied.length && !business.contact.optedOut) {
+    const [error] = await deliver(business, {
       body: t(language).standing(business.name, applied.join(', ')),
-      language,
     });
+    if (error) log.warn('standing', 'owner not told', { reason: error.reason, entity: business.id });
   }
   return ok({ applied: applied.length });
 }
@@ -171,6 +231,19 @@ export async function saveWhatsApp(entityId: string, input: WhatsAppPayload, ori
   if (error?.reason === 'SendFailed')
     return ok({ sent: false, applied, error: error.message as string | undefined });
   return ok({ sent: !!result?.sent, applied, error: undefined as string | undefined });
+}
+
+/** The owner's opt-out. Turning messages back on sends the next suggestion if it's within their window. */
+export async function saveContact(entityId: string, input: ContactPayload, origin: string) {
+  await ensureProfile(entityId);
+  await db
+    .update(businessProfile)
+    .set({ optedOut: input.optedOut })
+    .where(eq(businessProfile.entityId, entityId));
+  const business = await getBusiness(entityId);
+  if (!business) return err({ reason: 'NotFound' as const });
+  if (input.optedOut) return ok({ sent: false });
+  return sendNext(business, origin);
 }
 
 export async function sendTest(business: Business) {
@@ -226,22 +299,29 @@ export async function receiveWhatsApp(from: string, buttonId: string | undefined
   await sendNext(business, origin);
 }
 
-/** Nightly: look at pages again, apply standing permissions, send each owner their next question. */
-export async function runNightly(origin: string) {
+/**
+ * Every hour: once a day, look at linked pages again. Owners whose contact window is open get their standing
+ * permissions applied and their next question.
+ */
+export async function runScheduled(origin: string, now = new Date()) {
+  const checkPages = now.getUTCHours() === PAGE_CHECK_HOUR_UTC;
   const profiles = await db
     .select({ entityId: businessProfile.entityId })
     .from(businessProfile)
     .innerJoin(user, eq(user.entityId, businessProfile.entityId));
   for (const entityId of new Set(profiles.map((p) => p.entityId))) {
     try {
-      const business = await getBusiness(entityId);
+      let business = await getBusiness(entityId);
       if (!business) continue;
-      await recheckSources(business);
-      const fresh = (await getBusiness(entityId))!;
-      await applyStandingPermission(fresh);
-      if (fresh.whatsapp.on) await sendNext(fresh, origin);
+      if (checkPages) {
+        await recheckSources(business);
+        business = (await getBusiness(entityId))!;
+      }
+      if (!canContactNow(business, now)) continue;
+      await applyStandingPermission(business);
+      await sendNext(business, origin);
     } catch (error) {
-      log.error('nightly', 'business failed', { entity: entityId, error });
+      log.error('scheduled', 'business failed', { entity: entityId, error });
     }
   }
 }

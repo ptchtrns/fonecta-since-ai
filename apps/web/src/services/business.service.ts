@@ -79,6 +79,7 @@ export async function ensureProfile(entityId: string) {
       edits: {},
       whatsappLanguage: contact?.preferredLanguage ?? 'en',
       standingPermission: contact?.standingPermissionHolidays ?? false,
+      optedOut: contact?.optedOutOfSuggestions ?? false,
     })
     .onConflictDoNothing();
 }
@@ -112,6 +113,13 @@ async function readBusiness(entityId: string) {
       categoryName: category.nameEn,
       profile: businessProfile,
       contactFirstName: customerContact.contactFirstName,
+      contact: {
+        channel: customerContact.preferredChannel,
+        window: customerContact.bestContactWindow,
+        email: customerContact.email,
+        mobile: customerContact.mobile,
+        optedOut: customerContact.optedOutOfSuggestions,
+      },
     })
     .from(entity)
     .innerJoin(category, eq(category.id, entity.categoryId))
@@ -165,6 +173,15 @@ async function readBusiness(entityId: string) {
       minImportance: row.profile?.whatsappMinImportance ?? 'low',
       standingPermission: row.profile?.standingPermission ?? false,
       lastInboundAt: row.profile?.lastInboundAt ?? null,
+    },
+    // How the owner wants to be reached, from the customer record. The opt-out is the owner's latest choice.
+    contact: {
+      optedOut: row.profile?.optedOut ?? row.contact?.optedOut ?? false,
+      channel: row.contact?.channel ?? 'WHATSAPP',
+      window: row.contact?.window ?? '',
+      email: row.contact?.email ?? '',
+      mobile: row.contact?.mobile ?? '',
+      timeZone: e.timezone,
     },
   };
 }

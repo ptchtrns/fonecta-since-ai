@@ -16,8 +16,9 @@
     },
   ],
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "hackathon-uploads" }],
-  // Nightly run, 05:00 UTC (07:00 or 08:00 in Finland): reads linked pages, applies standing permissions, sends messages.
-  "triggers": { "crons": ["0 5 * * *"] },
+  // Hourly run: within each owner's contact window, applies standing permissions and sends their next message.
+  // Linked pages are read once a day, at 05:00 UTC.
+  "triggers": { "crons": ["0 * * * *"] },
   // Secrets: BETTER_AUTH_SECRET, WORKER_TOKEN, optionally YEXT_API_KEY and the WHATSAPP_* ones. See .dev.vars.example.
   // Locally in .dev.vars, in production via `wrangler secret put`. APP_URL is the public address used in owner links.
 }

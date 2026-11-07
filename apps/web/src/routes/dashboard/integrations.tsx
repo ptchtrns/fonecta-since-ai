@@ -3,6 +3,7 @@ import { revalidate, useBeforeLeave, type RouteDefinition } from '@solidjs/route
 import { createMemo, createSignal, For, onSettled, Show } from 'solid-js';
 import { FormField } from '~/components/FormField';
 import { FormMessage } from '~/components/FormMessage';
+import { ContactPreferences } from '~/components/connect/ContactPreferences';
 import { Page, PageHeader, Panel } from '~/components/connect/Page';
 import { BrandMark } from '~/components/connect/PublisherLogo';
 import { WhatsAppPreview } from '~/components/connect/WhatsAppPreview';
@@ -117,6 +118,8 @@ export default function Integrations() {
     <Page class="max-w-3xl">
       <Title>Integrations · Connecta AI</Title>
       <PageHeader title="Integrations" />
+
+      <ContactPreferences contact={workspace().contact} />
 
       <Panel>
         <form

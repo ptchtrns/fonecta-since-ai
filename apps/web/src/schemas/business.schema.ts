@@ -58,3 +58,9 @@ export const whatsappSchema = z
     path: ['phone'],
   });
 export type WhatsAppPayload = z.infer<typeof whatsappSchema>;
+
+export const contactSchema = z.object({
+  // The owner's own "no suggestion messages, thanks".
+  optedOut: z.boolean(),
+});
+export type ContactPayload = z.infer<typeof contactSchema>;
