@@ -13,7 +13,8 @@ The limited set (--limited) is small enough for D1's free plan: the demo busines
 weather and peer data limited to what they use, and analytics and daily weather limited to SUBSET_SINCE onwards.
 
 Every dataset table is emptied and refilled, so it is safe to re-run. App tables (user, job, ...) are not
-touched. Wrangler runs the generated SQL, so run this from anywhere; it switches to apps/web itself.
+touched, except prediction: its rows go with their businesses, so save them again with the predictor's
+run.py --save. Wrangler runs the generated SQL, so run this from anywhere; it switches to apps/web itself.
 """
 
 import argparse
@@ -363,24 +364,6 @@ def evaluation_targets():
             }
 
 
-def dev_labels():
-    for season, path in ((2026, "labels/dev_labels_2026.csv"), (2025, "labels/dev_labels_2025_backtest.csv")):
-        for r in read_csv(path):
-            yield {
-                "entity_id": r["entity_id"],
-                "date": r["date"],
-                "season": season,
-                "day_key": r["day_key"],
-                "event_id": blank_to_none(r["event_id"]),
-                "truth_hours": r["truth_hours"],
-                "displayed_hours_at_snapshot": r["displayed_hours_at_snapshot"],
-                "needs_action": to_bool(r["needs_action"]),
-                "expected_action": r["expected_action"],
-                "mismatch_type": blank_to_none(r["mismatch_type"]),
-                "expected_search_views": float(r["expected_search_views"]),
-            }
-
-
 def dev_truth_history():
     for r in read_csv("labels/dev_truth_history.csv"):
         yield {
@@ -391,27 +374,6 @@ def dev_truth_history():
             "truth_hours": r["truth_hours"],
             "displayed_hours_that_day": r["displayed_hours_that_day"],
         }
-
-
-def dev_regular_hours_truth():
-    for r in read_csv("labels/dev_regular_hours_truth.csv"):
-        yield {
-            "entity_id": r["entity_id"],
-            "true_regular_hours_now": r["true_regular_hours_now"],
-            "listing_is_outdated": to_bool(r["listing_is_outdated"]),
-            "permanently_closed": to_bool(r["permanently_closed"]),
-        }
-
-
-def sim_personas():
-    for entity_id, p in read_json("mock_api/sim_data.json")["personas"].items():
-        yield {"entity_id": entity_id, "responsiveness": p["responsiveness"], "channel": p["channel"]}
-
-
-def sim_truth():
-    for key, hours in read_json("mock_api/sim_data.json")["truth"].items():
-        entity_id, date = key.split("|")
-        yield {"entity_id": entity_id, "date": date, "hours": hours}
 
 
 # In foreign key order: parents before children. Emptying runs in reverse.
@@ -434,11 +396,7 @@ TABLES = {
     "listing": listings,
     "pilot_decision": pilot_decisions,
     "evaluation_target": evaluation_targets,
-    "dev_label": dev_labels,
     "dev_truth_history": dev_truth_history,
-    "dev_regular_hours_truth": dev_regular_hours_truth,
-    "sim_persona": sim_personas,
-    "sim_truth": sim_truth,
 }
 
 

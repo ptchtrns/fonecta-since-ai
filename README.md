@@ -1,163 +1,76 @@
-# Hackathon template
+# TODO team name – Connect Suggests
 
-Full-stack TypeScript on Cloudflare plus a Python worker for anything that needs its own machine.
+Our entry for the Fonecta challenge at Since AI Hackathon 2026. For setting up and developing the web app and worker, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-| Layer      | Choice                                                                             |
-| ---------- | ---------------------------------------------------------------------------------- |
-| Tooling    | pnpm workspaces, [Vite+](https://viteplus.dev) (`vp`: dev, build, lint, fmt, test) |
-| UI         | Solid 2 RC with SSR, `@solidjs/router` 2, daisyUI 5 on Tailwind 4                  |
-| Server     | `@solidjs/vite-plugin` start mode, API routes from `filesystem-routing`            |
-| Data       | Drizzle ORM 1.0 RC on Cloudflare D1 (SQLite), files in R2                          |
-| Auth       | Better Auth (email and password)                                                   |
-| Validation | zod 4                                                                              |
+## Run it
 
-```
-apps/
-  web/      Solid app, deployed as a Cloudflare Worker
-  worker/   Python job processor, runs anywhere with network access to web
-packages/   Shared code, if it ever becomes necessary
-```
-
-## Getting started
-
-Requires Node 22.18+, pnpm 11 and, for the worker, [uv](https://docs.astral.sh/uv/).
+Predictions (Python 3.9+, standard library only), from the repo root. They read the local database, so fill that first (needs Node, pnpm and uv):
 
 ```sh
-pnpm install
-cp apps/web/.dev.vars.example apps/web/.dev.vars
-pnpm db:migrate          # apply migrations to the local D1 database
-pnpm dev                 # http://localhost:3000
+pnpm install && pnpm db:migrate && pnpm db:seed
+
+python3 apps/predictor/run.py                 # 2026 season → predictions_2026.csv + score on dev businesses
+python3 apps/predictor/run.py --season 2025   # back-test as if today were 6 Nov 2025
+python3 apps/predictor/run.py --save local    # also show the 2026 predictions at /dashboard/suggestions
 ```
 
-Everything runs locally: the dev server executes the app inside workerd with local D1 and R2 emulation (state in `apps/web/.wrangler`).
+Demo: TODO
 
-Run the worker in a second terminal:
+## The five steps
 
-```sh
-cd apps/worker
-cp .env.example .env
-uv run worker
-```
+- **Detect:** `apps/predictor` compares what Google shows with what each business most likely does on every special day, using the business's own past entries, its shopping centre, similar businesses and customer reviews read by language models. Businesses that customers say have shut down for good are flagged for a person to check. See [apps/predictor/README.md](apps/predictor/README.md).
+- **Suggest:** TODO
+- **Contact:** TODO
+- **Owner decides (no login):** TODO
+- **Apply + confirm:** TODO
 
-## How the web app is organised
+## Data sources that mattered most (3–5)
 
-```
-apps/web/src/
-  routes/            pages (*.tsx) and API routes (routes/api/**.ts, exporting GET/POST/...)
-  schemas/           zod schemas per area, e.g. settings.schema.ts
-  services/          business logic, returns ok(data) or err({ reason })
-  server/            server-only modules: db, auth, HTTP helpers
-  queries/           router query() wrappers that read from the API
-  components/        UI
-  lib/               isomorphic helpers: Result type, API client, formatting, form state
-  db/schema.ts       Drizzle tables
-  middleware.ts      session lookup, page guards, API dispatch
-```
+| Signal | How we used it | Where Connect would get it in production |
+|---|---|---|
+| Past holiday entries (`holiday_hours_history.jsonl`) | Suggest what the owner entered for the same holiday in earlier years; confidence from how many years agree, recent years counting more | Connect's own audit log of exception hours |
+| Published listing (`entities.json`) | What Google shows now, to tell which suggestions are needed and which would be needless | Yext Knowledge Graph *Entities* |
+| Shopping-centre hours (centres in `entities.json` and their history) | Shops inside a centre get the centre's exact hours for days the centre has published; this beats the shop's own last-year entry | Centres' own websites or their Yext feeds, usually published 4–8 weeks before Christmas |
+| Weekly hours history (`regular_hours_history.jsonl`) | Move last year's hours to this year's weekday, e.g. "normal opening, close at 17" | Connect's audit log of published hours |
+| Peer benchmarks (`peer_benchmarks.csv`) | For businesses with no history: suggest "closed" when at least 20% of similar businesses close | Connect's own aggregated customer data |
 
-An API handler parses input, validates it with a schema, calls a service and maps the result to a response. Nothing else:
+## What we tried that didn't work
 
-```ts
-// src/routes/api/settings/password.ts
-export async function POST(event: ApiEvent) {
-  const user = currentUser(event);
-  const session = event.locals.session;
-  if (!user || !session) return unauthorized();
+- **Skipping last-year guesses with low confidence.** Lowered the score at every cut-off in both seasons. Even when an owner's past years disagree, the newest year is right more often than not.
+- **Using peers' typical special hours** (e.g. "similar cafés are open 10–13"). Lost points at every threshold: a median across businesses with different normal hours rarely matches one business exactly.
+- **Counting only peers who entered something.** "100% of the cafés that entered something were closed" was still usually wrong, because most businesses enter nothing and keep their normal hours.
+- **Applying peers' typical change to the business's own hours** (e.g. "cafés close 5 h early on Christmas Eve" applied to its own opening hours). Lowered the score in both seasons. Of 255 such suggestions, 212 went to owners who had simply kept their normal hours. Businesses without history almost always keep normal hours, so learning from owners who did enter something over-suggests changes.
+- **A small language model on a laptop for reading reviews.** `qwen3:1.7b` read Finnish "ovet olivat kiinni" (the doors were closed) as *open* every time.
+- **Asking the model for everything in one question.** When we asked for the closing time in the same question as "what did the customer find?", the model started inventing times and then answered "closed early" for reviews where the business was closed all day: 219 of 300 right instead of 293. Two short questions fixed it.
+- **One reading model for all three countries.** Mistral-Small 24B reads Swedish and Norwegian well, but translated Finnish "Kiva että olitte auki" (glad you were open) as "I wish you had been open". Reviews of Finnish businesses now go to Qwen2.5-72B, which read all of those correctly.
 
-  const validation = changePasswordSchema.safeParse(await readJson(event.request));
-  if (!validation.success) return validationFailed(validation.error, changePasswordSchema);
+## Customer with no history / no previous actions
 
-  const [error] = await changePassword(user.id, validation.data, session.id);
-  if (error) {
-    switch (error.reason) {
-      case 'IncorrectPassword':
-        return json({ fieldErrors: { oldPassword: 'Incorrect password' } }, 400);
-      default:
-        return unexpected();
-    }
-  }
+When an owner has never entered anything for a holiday, the predictor falls back to other evidence:
 
-  return json({ message: 'Password changed' });
-}
-```
+- **How often the same type of business really closes** on that holiday in the same country, learned from the true hours of the training businesses. It suggests "closed" when at least 80% of them closed.
+- **What similar businesses entered** (same country, city size and type): "closed" when at least 20% of them entered closed.
+- **Recent reviews** where customers found the doors closed on that holiday, and **Google users' suggested hours** for the same holiday last time.
+- **Seasons and snow:** summer terraces in winter, ski rentals in summer, and ski rentals when there isn't enough snow.
 
-Responses follow `ApiResponse` (`{ message?, fieldErrors?, data? }`) from `src/lib/api.ts`. The same schemas run in the browser before a form is sent (`createFormState().validate`), so users get instant feedback and the server stays the source of truth.
+Otherwise it stays quiet, because owners with no history almost always keep their normal hours (see above). TODO: show `FI-D0017` Kahvila Kipinä in the demo.
 
-Pages are server rendered. Their data comes from the same REST routes: `apiGet()` calls `fetch` in the browser and dispatches the route in-process during SSR, so there are no server functions and no duplicate data paths.
+## Final customer messages (as text)
 
-### Adding a feature
+TODO
 
-1. Table in `src/db/schema.ts`, then `pnpm db:generate` and `pnpm db:migrate`.
-2. Schema in `src/schemas/<area>.schema.ts`.
-3. Service in `src/services/<area>.service.ts` returning `ok()` / `err()`.
-4. Route in `src/routes/api/<area>.ts`.
-5. `query()` in `src/queries/` and a page or component that reads it.
+## Bonus: live source
 
-If a new server-side package shows up in dev as "file does not exist ... optimize deps", add it to `environments.ssr.optimizeDeps.include` in `apps/web/vite.config.ts`.
+TODO
 
-## Jobs and the worker
+## Third-party code, data and licences
 
-`POST /api/jobs` queues a job (`{ type, payload }`). The worker claims jobs through `POST /api/jobs/claim` and reports through `PATCH /api/jobs/:id`, authenticated with `WORKER_TOKEN`. Add job types as files in `apps/worker/worker/handlers/`. See `apps/worker/README.md`.
+| Component | Licence |
+|---|---|
+| Connect Suggests simulator dataset, Since AI ry 2026 (`data/fonecta-connect-suggests-2026`) | Data CC BY 4.0, code MIT |
+| `apps/predictor` | Python standard library only |
+| Qwen2.5-72B-Instruct, used through Featherless to read reviews of Finnish businesses | Qwen licence (commercial use allowed below 100 million monthly users) |
+| Mistral-Small-24B-Instruct-2501, used through Featherless to read reviews of Swedish and Norwegian businesses | Apache 2.0 |
+| TODO: web app and worker dependencies | |
 
-## Connect Suggests dataset
-
-`data/fonecta-connect-suggests-2026/` holds the hackathon bundle, unchanged. Start with its `START_HERE.md`; the fields are described in `docs/DATA_DICTIONARY.md`. Attribution: "Connect Suggests simulator, Since AI ry 2026" (data CC BY 4.0, code MIT, see its `LICENSE.md`). All of it is synthetic.
-
-`src/db/schema.ts` has a table for each data source. To load them, with [uv](https://docs.astral.sh/uv/) installed:
-
-```sh
-pnpm db:migrate
-pnpm db:seed                       # everything, local
-pnpm db:seed:limited               # limited set, local
-pnpm --filter web db:seed:remote   # limited set, deployed database
-```
-
-Each run empties and refills the dataset tables and leaves app tables alone.
-
-| Load    | Businesses | Rows | Size   | Est. rows written |
-| ------- | ---------- | ---- | ------ | ----------------- |
-| Full    | 3,032      | 3.5M | 272 MB | over 7M           |
-| Limited | 32         | 29k  | 3.4 MB | 61k               |
-
-The limited set is the 17 demo businesses and 15 shopping centres. It keeps their full holiday history and reviews, limits analytics and daily weather to 1 Nov 2025 onwards, and limits weather and peer data to what they use. It has no `dev` or `test` businesses, so the `dev_*` tables stay empty and the 2025 back-test targets aren't loaded. Work across all businesses, such as producing `predictions_2026.csv`, has to read the files in `data/`.
-
-D1's free plan allows [100,000 written rows a day](https://developers.cloudflare.com/d1/platform/limits/), and indexes count as writes. That is why deployments get the limited set, which fits once a day. A second load on the same day probably won't, because deleting the old rows counts too. Loading everything into a deployed database needs the paid plan and a direct `import_connect_data.py --remote` run.
-
-The `dev_*` and `sim_truth` tables hold answers, so keep them out of anything that produces predictions.
-
-## Deploying
-
-Pushing to `main` runs `.github/workflows/deploy.yml`: typecheck, build, create D1 and R2 on the first run, apply migrations, deploy.
-
-One-time setup:
-
-1. Add repository secrets `CLOUDFLARE_API_TOKEN` (Workers, D1 and R2 edit permissions) and `CLOUDFLARE_ACCOUNT_ID`.
-2. After the first deploy, set the app secrets:
-   ```sh
-   cd apps/web
-   pnpm exec wrangler secret put BETTER_AUTH_SECRET   # openssl rand -base64 32
-   pnpm exec wrangler secret put WORKER_TOKEN
-   ```
-3. Point the worker's `API_URL` at the deployed URL.
-
-Manual deploy: `pnpm db:migrate:remote` (from `apps/web`) and `pnpm deploy`.
-
-## Scripts
-
-| Command                | What it does                                 |
-| ---------------------- | -------------------------------------------- |
-| `pnpm dev`             | Dev server for apps/web                      |
-| `pnpm build`           | Production build                             |
-| `pnpm check`           | Format check, lint and type-aware checks     |
-| `pnpm db:generate`     | Generate a migration from `src/db/schema.ts` |
-| `pnpm db:migrate`      | Apply migrations locally                     |
-| `pnpm db:seed`         | Load the whole Connect dataset into local D1 |
-| `pnpm db:seed:limited` | Load the limited Connect set into local D1   |
-| `pnpm deploy`          | Build and deploy with wrangler               |
-
-In `apps/web`, `pnpm cf-typegen` regenerates `worker-configuration.d.ts` after changing `wrangler.jsonc`, and `pnpm preview` runs the production build locally.
-
-## Notes
-
-- Solid 2, its router and `@solidjs/vite-plugin` are prereleases. Pin versions and expect API changes when upgrading.
-- Images in R2 are served publicly from `/api/files/<key>`. Keys contain a random UUID.
-- Passwords are hashed with PBKDF2 through WebCrypto, which stays inside the Workers free plan CPU limit.
+No GPL/AGPL components without Fonecta's written approval.

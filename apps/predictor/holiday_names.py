@@ -1,0 +1,118 @@
+"""Holiday names as customers write them in reviews, in Finnish, Swedish, Norwegian and English."""
+
+# Each name is mapped to the data's day key. More specific names come first:
+# "lille julaften" must be found before "julaften".
+HOLIDAY_NAMES = [
+    # Finnish (word stems, so that inflected forms like "tapaninpäivänä" match)
+    ("aatonaatto", "DEC23"),
+    ("jouluaatto", "XMAS_EVE"),
+    ("joulupäiv", "XMAS_DAY"),
+    ("tapaninpäiv", "BOXING_DAY"),
+    ("välipäiv", "INTERDAY"),
+    ("uudenvuodenaatto", "NYE"),
+    ("uudenvuodenpäiv", "NEW_YEARS_DAY"),
+    ("loppiaisaatto", "EPIPHANY_EVE"),
+    ("loppiai", "EPIPHANY"),
+    ("itsenäisyyspäiv", "INDEPENDENCE_DAY"),
+    ("isänpäiv", "FATHERS_DAY"),
+    ("äitienpäiv", "MOTHERS_DAY"),
+    ("pyhäinpäiv", "ALL_SAINTS"),
+    ("kiirastorsta", "MAUNDY_THURSDAY"),
+    ("pitkänäperjantai", "GOOD_FRIDAY"),
+    ("pitkäperjantai", "GOOD_FRIDAY"),
+    ("pääsiäislauantai", "EASTER_SATURDAY"),
+    ("2. pääsiäispäiv", "EASTER_MONDAY"),
+    ("toisena pääsiäispäiv", "EASTER_MONDAY"),
+    ("pääsiäispäiv", "EASTER_SUNDAY"),
+    ("vappuaatto", "MAY_EVE"),
+    ("vappu", "MAY_DAY"),
+    ("helatorsta", "ASCENSION"),
+    ("helluntai", "PENTECOST"),
+    ("juhannusaatto", "MIDSUMMER_EVE"),
+    ("juhannuspäiv", "MIDSUMMER_DAY"),
+    # Swedish
+    ("lillejulafton", "DEC23"),
+    ("julafton", "XMAS_EVE"),
+    ("juldag", "XMAS_DAY"),
+    ("annandag jul", "BOXING_DAY"),
+    ("mellandag", "INTERDAY"),
+    ("nyårsafton", "NYE"),
+    ("nyårsdag", "NEW_YEARS_DAY"),
+    ("trettondagsafton", "EPIPHANY_EVE"),
+    ("trettondag", "EPIPHANY"),
+    ("fars dag", "FATHERS_DAY"),
+    ("mors dag", "MOTHERS_DAY"),
+    ("alla helgons", "ALL_SAINTS"),
+    ("skärtorsdag", "MAUNDY_THURSDAY"),
+    ("långfredag", "GOOD_FRIDAY"),
+    ("påskafton", "EASTER_SATURDAY"),
+    ("påskdag", "EASTER_SUNDAY"),
+    ("annandag påsk", "EASTER_MONDAY"),
+    ("valborg", "MAY_EVE"),
+    ("första maj", "MAY_DAY"),
+    ("himmelsfärd", "ASCENSION"),
+    ("pingstafton", "PENTECOST_EVE"),
+    ("pingstdag", "PENTECOST"),
+    ("nationaldag", "NATIONAL_DAY"),
+    ("midsommarafton", "MIDSUMMER_EVE"),
+    ("midsommardag", "MIDSUMMER_DAY"),
+    # Norwegian
+    ("lille julaften", "DEC23"),
+    ("julaften", "XMAS_EVE"),
+    ("første juledag", "XMAS_DAY"),
+    ("andre juledag", "BOXING_DAY"),
+    ("romjul", "INTERDAY"),
+    ("nyttårsaften", "NYE"),
+    ("nyttårsdag", "NEW_YEARS_DAY"),
+    ("farsdag", "FATHERS_DAY"),
+    ("morsdag", "MOTHERS_DAY"),
+    ("skjærtorsdag", "MAUNDY_THURSDAY"),
+    ("langfredag", "GOOD_FRIDAY"),
+    ("påskeaften", "EASTER_SATURDAY"),
+    ("første påskedag", "EASTER_SUNDAY"),
+    ("andre påskedag", "EASTER_MONDAY"),
+    ("17. mai", "NATIONAL_DAY"),
+    (" 1. mai", "MAY_DAY"),
+    ("himmelfartsdag", "ASCENSION"),
+    ("pinseaften", "PENTECOST_EVE"),
+    ("første pinsedag", "PENTECOST"),
+    ("andre pinsedag", "WHIT_MONDAY"),
+    # English
+    ("christmas eve", "XMAS_EVE"),
+    ("christmas day", "XMAS_DAY"),
+    ("boxing day", "BOXING_DAY"),
+    ("new year's eve", "NYE"),
+    ("new year's day", "NEW_YEARS_DAY"),
+    ("epiphany eve", "EPIPHANY_EVE"),
+    ("epiphany", "EPIPHANY"),
+    ("independence day", "INDEPENDENCE_DAY"),
+    ("father's day", "FATHERS_DAY"),
+    ("mother's day", "MOTHERS_DAY"),
+    ("all saints", "ALL_SAINTS"),
+    ("maundy thursday", "MAUNDY_THURSDAY"),
+    ("good friday", "GOOD_FRIDAY"),
+    ("easter saturday", "EASTER_SATURDAY"),
+    ("easter sunday", "EASTER_SUNDAY"),
+    ("easter monday", "EASTER_MONDAY"),
+    ("may day", "MAY_DAY"),
+    ("ascension", "ASCENSION"),
+    ("whit monday", "WHIT_MONDAY"),
+    ("midsummer eve", "MIDSUMMER_EVE"),
+    ("midsummer day", "MIDSUMMER_DAY"),
+    ("national day", "NATIONAL_DAY"),
+    # Same in every language
+    ("black friday", "BLACK_FRIDAY"),
+    ("lucia", "LUCIA"),
+]
+
+
+def find_holiday(review_text):
+    """The day key of the holiday a review talks about, like "BOXING_DAY", or None."""
+    # Both apostrophes appear in "New Year's Eve". The leading space lets " 1. mai" match at the
+    # very start of a review without matching inside "11. mai".
+    text = " " + review_text.lower().replace("’", "'")
+
+    for name, day_key in HOLIDAY_NAMES:
+        if name in text:
+            return day_key
+    return None

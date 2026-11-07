@@ -13,6 +13,7 @@ const COLLAPSED_KEY = 'sidebar-collapsed';
 
 const links: { href: string; label: string; icon: typeof HomeIcon }[] = [
   { href: '/dashboard', label: 'Overview', icon: HomeIcon },
+  { href: '/dashboard/suggestions', label: 'Suggestions', icon: ClockIcon },
   { href: '/dashboard/analytics', label: 'Analytics', icon: ChartIcon },
   { href: '/dashboard/ai', label: 'AI', icon: SparklesIcon },
   { href: '/dashboard/settings', label: 'Settings', icon: CogIcon },
@@ -191,6 +192,14 @@ function HomeIcon() {
   return (
     <Icon>
       <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z" />
+    </Icon>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <Icon>
+      <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2" />
     </Icon>
   );
 }

@@ -40,3 +40,6 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 *.swp
+
+# Predictor: local test output (predictions_2026.csv is the submission, keep it tracked)
+predictions_2025_backtest.csv
