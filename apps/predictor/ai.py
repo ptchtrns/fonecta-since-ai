@@ -51,7 +51,7 @@ def ask(question, instructions, model=MODEL):
     """Ask the model a question and return its answer as a dict ({} if it didn't answer in JSON)."""
     key = cache_key(question, instructions, model)
     if key not in cache:
-        cache[key] = send(question, instructions, model)
+        cache[key] = send_until_readable(question, instructions, model)
         save_cache()
 
     return read_json_answer(cache[key])
@@ -64,7 +64,7 @@ def ask_many(questions, instructions, model=MODEL):
     """
     new_questions = [question for question in questions if not is_cached(question, instructions, model)]
     with ThreadPoolExecutor(max_workers=AT_ONCE.get(model, 1)) as pool:
-        answers = pool.map(lambda question: send(question, instructions, model), new_questions)
+        answers = pool.map(lambda question: send_until_readable(question, instructions, model), new_questions)
         for question, answer in zip(new_questions, answers):
             cache[cache_key(question, instructions, model)] = answer
             save_cache()
@@ -93,6 +93,16 @@ def read_json_answer(text):
         except json.JSONDecodeError:
             start = text.rfind("{", 0, start)
     return {}
+
+
+def send_until_readable(question, instructions, model, attempts=3):
+    """Ask again when a reply has no JSON answer in it. Qwen2.5-72B on Featherless sometimes fills the
+    whole reply with "!!!!" before it gets to the answer."""
+    for _ in range(attempts):
+        answer = send(question, instructions, model)
+        if read_json_answer(answer):
+            return answer
+    return answer
 
 
 def send(question, instructions, model):

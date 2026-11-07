@@ -3,7 +3,7 @@
     python3 apps/predictor/read_reviews.py 100      # read the next 100 unread reviews
     python3 apps/predictor/read_reviews.py clean    # drop cached answers that nothing uses any more
 
-The answers go into ai_cache.json, and run.py uses them without asking again. See PROMPT_NOTES.md.
+The answers go into ai_cache.json, and run.py uses them without asking again.
 """
 
 import random
@@ -43,7 +43,8 @@ def main():
         ai.ask_many([question_about(text) for text in texts if needs_times(text, model)], TIME_INSTRUCTIONS, model)
 
     read = [(text, country) for text, country in reviews if already_read(text, country)]
-    print(f"Read {len(batch)} reviews now ({ai.tokens_used} tokens). {len(read)} of {len(reviews)} read, {len(reviews) - len(read)} left.")
+    print(f"Read {len(batch)} reviews now ({ai.tokens_used} tokens).")
+    print(f"{len(read)} of {len(reviews)} read, {len(reviews) - len(read)} left.")
     print("Answers so far:", dict(Counter(read_review(text, country)["found"] for text, country in read)))
 
 
@@ -69,7 +70,7 @@ def reviews_the_clue_reads():
 
 
 def clean_cache():
-    """Keep only the answers the reviews clue uses: the current instructions, asked of the model for that country."""
+    """Keep only the answers the clues use: the current instructions, asked of the model for that country."""
     needed = set()
     for text, country in reviews_the_clue_reads():
         for instructions in [INSTRUCTIONS, TIME_INSTRUCTIONS]:

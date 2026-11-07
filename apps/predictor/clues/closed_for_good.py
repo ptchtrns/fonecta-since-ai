@@ -8,6 +8,7 @@ Google user reporting it closed.
 from datetime import date, timedelta
 
 from clues.reviews import recent_reviews
+from holiday_names import find_holiday
 from review_reading import is_about_hours, read_review
 
 # An older sign could be about a business that has since reopened.
@@ -39,6 +40,8 @@ def shutdown_signs(data, business):
         text = review["content"]
         if not text or review["written_on"] < oldest_allowed or not is_about_hours(text):
             continue
+        if find_holiday(text):
+            continue  # a review that names a holiday is about that day, not about shutting down
         if read_review(text, business["meta"]["countryCode"])["found"] == "permanently_closed":
             day = review["written_on"].isoformat()
             signs.append((day, f"A customer wrote on {day} that the business has shut down"))

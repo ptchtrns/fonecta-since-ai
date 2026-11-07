@@ -26,7 +26,7 @@ python3 apps/predictor/read_reviews.py 300     # read the next 300 unread review
 python3 apps/predictor/read_reviews.py clean   # drop cached answers nothing uses any more
 ```
 
-Reading all ~1,350 reviews costs about 15 cents. Setting `PROVIDER = "ollama"` in `ai.py` runs a local model instead, but the small ones that fit a laptop read Finnish badly.
+Reading all 1,350 reviews cost about 10 cents. Setting `PROVIDER = "ollama"` in `ai.py` runs a local model instead, but the small ones that fit a laptop read Finnish badly.
 
 A change should improve **both** seasons. The organisers score hidden businesses, and real customers have longer histories than this dataset, so rules should make sense in general, not just fit these numbers.
 
@@ -50,14 +50,14 @@ For every question (one business on one day):
 | `combine.py` | Combines the clues: agreeing clues raise the confidence, `1 - (1 - c1) × (1 - c2) × …`, so two clues at 0.7 give 0.91 | Done |
 | `ai.py` | Asks a language model on Featherless (or a local one through Ollama) and returns its JSON answer. Every answer is cached in `ai_cache.json`. Waits and tries again while Featherless is busy, and stops a run after 2 million tokens | Done |
 | `holiday_names.py` | Holiday names as customers write them, in fi/sv/nb/en. `find_holiday(text)` was right for 99.9% of reviews, checked against the review dates | Done |
-| `review_reading.py` | Asks the model what a review says (closed, closed early, opened late, open, shut down for good, or nothing useful) and, for closed early or opened late, which times it gives. Finnish businesses' reviews go to Qwen2.5-72B, Swedish and Norwegian ones to Mistral-Small 24B. `PROMPT_NOTES.md` explains how the instructions were written | Done |
+| `review_reading.py` | Asks the model what a review says (closed, closed early, opened late, open, shut down for good, or nothing useful) and, for closed early or opened late, which times it gives. Finnish businesses' reviews go to Qwen2.5-72B, Swedish and Norwegian ones to Mistral-Small 24B | Done |
 | `read_reviews.py` | Reads the reviews the clues need, in batches, and cleans the cache | Done |
 | `clues/closed_for_good.py` | Flags a business when a recent review says it shut down for good, or a Google user reported it closed, and the owner hasn't entered anything since. Skipped when Google already shows it closed | Done |
 | `clues/google_edits.py` | A Google user suggested hours for this holiday the last time it came round: suggest those, with less confidence than the owner's own entries. Such edits matched what really happened about 9 times out of 10, but owners don't always repeat themselves | Done |
 | `clues/last_year.py` | Suggests the newest year's hours. Confidence = how much past years agree, recent years count more (`YEAR_WEIGHT_DECAY`), and lower for every year the owner has skipped since (`SKIPPED_YEAR_DECAY`). Adjusts for the holiday falling on a different weekday | Done |
 | `clues/mall.py` | Shop in a shopping centre that published hours for the day: suggest the centre's exact hours (shops did this ~250 times vs 6 times keeping their own opening time). More confident when the shop's own past entries show it follows its centre, much less when they show it keeps its own hours | Done |
 | `clues/peers.py` | Suggests closed when at least 20% of similar businesses entered closed | Done |
-| `clues/reviews.py` | What a customer found on this holiday last year, from the newest review about it: closed → closed; closed early at a time → normal opening to that time ("came at 16.20, already closed" → 16:00); opened late at a time → that time to normal closing; open although Google said closed → normal hours | Done, reviews being read |
+| `clues/reviews.py` | What a customer found on this holiday last year, from the newest review about it: closed → closed; closed early at a time → normal opening to that time ("came at 16.20, already closed" → 16:00); opened late at a time → that time to normal closing; open although Google said closed → normal hours | Done |
 | `clues/seasonal_break.py` | Businesses that close for the same part of every year (summer terraces in winter, ski rentals in summer): suggest closed when the business was on its published break on the same date in earlier years. A business that never published a break gets its type's season instead, but only for types whose businesses do publish breaks | Done |
 | `clues/snow.py` | Ski rentals: suggest closed when the forecast (next 10 days) or the long-term normal says there won't be 10 cm of snow. Never suggests "open": snow doesn't tell the hours, and early in the winter the normal says snow before the season has started | Done |
 | `clues/type_habits.py` | Owner never entered anything for this holiday: suggest closed when at least 80% of the same type and country really closed, learned from the training data | Done |
@@ -198,8 +198,9 @@ Add it to `clues/__init__.py` and to the list passed to `combine` in `run.py`. T
 | 7 Nov | `combine` instead of a fixed clue order | 64.55 | 61.20 |
 | 7 Nov | + type habits (no own history, ≥ 80% of the type closed) | 65.00 | 61.80 |
 | 7 Nov | + closed-for-good flag (catches 1 of the 2 dev businesses; the other has no review or edit to go on) | 65.22 | 61.80 |
+| 7 Nov | + Google edits, snow, seasonal breaks, less trust in skipped years, shops that follow their centre, and the reviews clue with every review read | **66.27** | **63.35** |
 
-Scores from 7 Nov onwards are without the reviews clue, which hasn't had its first full run yet. The Google edits, snow and seasonal-break clues get their row after that run.
+The rows before the last are without the reviews clue. A run takes about 10 seconds once the reviews are in `ai_cache.json`.
 
 **Tried and dropped:**
 - Skipping last-year guesses with low confidence: lowered the score at every cut-off in both seasons. The newest year is right more often than not, even when years disagree.
@@ -246,13 +247,13 @@ Each idea starts from why it should work for real businesses, not from the dev s
 1. **Reviews that don't name the holiday.** "Came here on the holiday but it was closed" could be matched to the nearest holiday by the date the review was written.
 2. **An AI judge for disagreements.** When clues disagree (about 300 dev rows per season), give a model all the evidence: the owner's past entries, the centre's hours, reviews, edits, what similar businesses do. Ask for the hours, how sure it is and a reason for the owner. Even a perfect judge there would add at most +1.2 to +1.7 points, so the main value is the explanation for the owner. Replacing `combine` everywhere isn't worth it: a perfect judge on every row would reach about 75 in 2026, but only by knowing when an owner changed their habit, which isn't in the clues, and it would mean about 20,000 questions per season.
 3. **Spotting outdated normal hours.** Per business, give the model its reviews, its weekly-hours edits and its current listing, and ask: have the normal hours changed, and to what?
-4. **Combining the weak signals in one model.** Customer activity, type habits below 80%, peers below 20% and owners' other holidays each stay under a 50% chance of "closed" on their own (see "Tried and dropped"). A small model trained on earlier seasons of the dev businesses' true hours might pass 50% for part of the silent owners. A guess of +1 to +3 points; untested. The activity data needs pandas and pyarrow, so it would be a preprocessing step.
+4. **A learned decider instead of "highest confidence wins".** Built and tested, not switched on yet. For every day it lists the options (each clue's hours, a weaker "closed", Sunday hours on a public holiday, Saturday hours on an eve), and a model predicts how many points each would earn from what it learned in earlier seasons: the dev businesses' true hours, and the owners' answers to the 2025 pilot. It suggests the best option only when that's clearly above zero, and otherwise stays silent. It learns only from seasons that ended before the snapshot, as the challenge's back-test rule requires: +1.4 in 2026 (learning from the 2024 and 2025 seasons and the pilot answers) and +1.8 in the 2025 back-test (learning only from the 2024 season). In the product, every new approve, edit or decline from an owner would become another example. Not switched on because it needs scikit-learn, pandas and pyarrow, and a run takes several minutes longer while it replays the earlier seasons.
 5. **An owner profile.** A model reads an owner's whole history and describes their habits ("closes on public holidays, short hours on eves, follows the centre"), then predicts the days they skipped. The simple rule version only broke even (see above), so this needs a careful test.
 6. **Which events matter.** A model reads the event names and keywords in `local_events.json` and decides which nearby businesses get a busy evening: the bar next to the arena, not the dentist.
 7. **Writing the owner messages.** Turn the clues' reasons into a short message in the owner's language (fi/sv/nb), and understand free-text replies like "we close at 3 instead".
 
 ## Next steps
 
-1. Finish reading the reviews, score the reviews clue on both seasons and set `REVIEW_CONFIDENCE`. On dev businesses, about 9 in 10 reviews read as "closed" were about days the business really was closed.
+1. Switch on the learned decider (AI idea 4) once runs are faster: predict all options of a day at once instead of one by one.
 2. Export the review readings with business IDs (`review_readings.csv`), so the website and the owner messages can quote them.
 3. The AI judge for when clues disagree (AI idea 2).

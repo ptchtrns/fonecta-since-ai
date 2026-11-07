@@ -12,13 +12,27 @@ MIN_DAYS = 10
 
 
 def guess_from_type_habits(data, business, holiday):
-    business_id = business["meta"]["id"]
-
     # The owner's own entries decide instead, when there are any.
-    if data["holiday_history"][(business_id, holiday)]:
+    if data["holiday_history"][(business["meta"]["id"], holiday)]:
         return None
 
+    closed_rate = type_closed_rate(data, business, holiday)
+    if closed_rate is None or closed_rate < MIN_CLOSED_RATE:
+        return None
+
+    return {
+        "hours": "closed",
+        "confidence": closed_rate,
+        "reason": f"{closed_rate:.0%} of businesses like yours were closed on this day in earlier years",
+    }
+
+
+def type_closed_rate(data, business, holiday):
+    """The share of days businesses of this type and country were really closed on this holiday, or None
+    if there are fewer than MIN_DAYS days to go on."""
+    business_id = business["meta"]["id"]
     group = (business["meta"]["countryCode"], business["c_segment"], holiday)
+
     days = 0
     closed_days = 0
     for other_id, (other_days, other_closed_days) in data["true_closures"].get(group, {}).items():
@@ -29,13 +43,4 @@ def guess_from_type_habits(data, business, holiday):
 
     if days < MIN_DAYS:
         return None
-
-    closed_rate = closed_days / days
-    if closed_rate < MIN_CLOSED_RATE:
-        return None
-
-    return {
-        "hours": "closed",
-        "confidence": closed_rate,
-        "reason": f"{closed_rate:.0%} of businesses like yours were closed on this day in earlier years",
-    }
+    return closed_days / days

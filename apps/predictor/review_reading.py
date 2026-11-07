@@ -27,7 +27,7 @@ ANSWERS_WITH_TIMES = ["closed_early", "opened_late"]
 TIMES = ["opened_at", "closed_at", "arrived_at"]
 
 # Two short questions instead of one long one: asking for the times in the same question made the
-# model invent times and then answer closed_early (see PROMPT_NOTES.md, version 5).
+# model invent times and then answer closed_early.
 # Kept short on purpose: we only add what the mistakes show is missing. Changing either text makes
 # every review get asked again.
 INSTRUCTIONS = """Read a customer review of a business. What did the customer find when they came?
@@ -67,7 +67,9 @@ def read_review(review_text, country):
     Times are only asked for when the business closed early or opened late.
     """
     model = READING_MODELS[country]
-    reading = {"found": what_customer_found(review_text, model), "opened_at": None, "closed_at": None, "arrived_at": None}
+    reading = {"found": what_customer_found(review_text, model)}
+    for name in TIMES:
+        reading[name] = None
 
     if reading["found"] in ANSWERS_WITH_TIMES:
         times = ai.ask(question_about(review_text), TIME_INSTRUCTIONS, model)

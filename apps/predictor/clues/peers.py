@@ -9,13 +9,8 @@ MIN_SHARE_CLOSED = 0.2
 
 
 def guess_from_peers(data, business, holiday):
-    city_size = data["city_sizes"].get(business["address"]["city"])
-    peers = data["peers"].get((business["meta"]["countryCode"], city_size, business["c_segment"], holiday))
-    if not peers:
-        return None
-
-    share_closed = float(peers["share_entered_closed"] or 0)
-    if share_closed < MIN_SHARE_CLOSED:
+    share_closed = peers_share_closed(data, business, holiday)
+    if share_closed is None or share_closed < MIN_SHARE_CLOSED:
         return None
 
     return {
@@ -23,3 +18,12 @@ def guess_from_peers(data, business, holiday):
         "confidence": share_closed,
         "reason": f"{share_closed:.0%} of similar businesses nearby have told us they close on this day",
     }
+
+
+def peers_share_closed(data, business, holiday):
+    """The share of similar businesses that entered "closed" for this holiday, or None if there are no peers."""
+    city_size = data["city_sizes"].get(business["address"]["city"])
+    peers = data["peers"].get((business["meta"]["countryCode"], city_size, business["c_segment"], holiday))
+    if not peers:
+        return None
+    return float(peers["share_entered_closed"] or 0)
