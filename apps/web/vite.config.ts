@@ -45,7 +45,7 @@ export default defineConfig({
       },
     },
   },
-  server: { port: 3000 },
+  server: { port: 3000, allowedHosts: ['concise-holy-mallard.ngrok-free.app'] },
   build: { target: 'esnext' },
 });
 
