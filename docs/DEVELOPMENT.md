@@ -143,7 +143,9 @@ Dataset tables stay as they were loaded, so clicks in the demo can't change what
 
 Optional settings, all in `.dev.vars.example`:
 
-- `YEXT_API_URL`, `YEXT_API_KEY`: where approved changes are written. Without them decisions are saved and the UI says they aren't live. The dataset's mock (`python3 data/fonecta-connect-suggests-2026/mock_api/server.py`) only accepts `hours`, `name` and `closed`, so saving other business details against it shows its error. The real API takes them.
+- `YEXT_API_URL`, `YEXT_API_KEY`: the team's Yext sandbox. Its locations show up in the business search, marked "Yext". Taking one on copies it into `entity` with `split = 'yext'`, and its dashboard reads it from Yext again on each load. Changes to it go to the sandbox. A reseed removes the copy, and the app adds it again from Yext the next time someone opens it. The predictor answers the season's special days for these businesses when saving with `--save`, but leaves them out of `predictions_2026.csv` and the score.
+- `YEXT_MOCK_URL`: the dataset's mock (`python3 data/fonecta-connect-suggests-2026/mock_api/server.py`), for the dataset's businesses, which the sandbox doesn't have. It only accepts `hours`, `name` and `closed`, so saving other business details against it shows its error.
+- Without the Yext API a business needs, decisions are saved and the UI says they aren't live. Before each write the app reads the hours Yext has now and changes only what was approved, because Yext replaces the whole hours object.
 - `WHATSAPP_*`: the Cloud API. Button taps arrive at `/api/whatsapp/webhook`. Without these, Integrations still shows the next message and a link to its answer page.
 - `APP_URL`: the public address in owner links, and required for the nightly cron, which reads linked pages again, applies standing permissions and sends each owner their next question.
 

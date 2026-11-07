@@ -24,7 +24,7 @@ from clues import (
 )
 from combine import combine
 from hours import shown_on_google_back_then, shown_on_google_now
-from load import load_everything, load_questions
+from load import load_everything, load_questions, load_yext_questions
 from save import save_predictions
 
 ROOT = Path(__file__).parents[2]
@@ -72,7 +72,15 @@ def main():
 
     print(f"Wrote {season['output'].name}")
     if args.save:
-        save_predictions(predictions, args.save)
+        # Businesses from the Yext account are shown on the dashboard, but they aren't in the file or the score.
+        from_yext = [
+            dict(answer, question=question)
+            for question in load_yext_questions(int(args.season))
+            if (answer := decide(data, season, question))
+        ]
+        if from_yext:
+            print(f"{len(from_yext)} suggestions for businesses from Yext")
+        save_predictions(predictions + from_yext, args.save)
     subprocess.run([
         sys.executable, DATASET / "evaluation" / "evaluate.py",
         "--predictions", season["output"],

@@ -5,10 +5,12 @@ WORKER_TOKEN=local-worker-token
 # BETTER_AUTH_URL=http://localhost:3000
 # Public address for links in owner messages (a tunnel locally). Nightly messages need it.
 # APP_URL=https://your-tunnel.ngrok-free.app
-# Yext: the dataset's mock (python3 data/fonecta-connect-suggests-2026/mock_api/server.py, key "demo") or the sandbox
-# (https://sbx-api.yextapis.com). Without it approved changes are saved here but not published. Never commit a real key.
-# YEXT_API_URL=http://localhost:8787
-# YEXT_API_KEY=demo
+# Yext sandbox: its businesses show up in the business search, and changes to them go to Yext. Never commit the key.
+# YEXT_API_URL=https://sbx-api.yextapis.com
+# YEXT_API_KEY=
+# The dataset's mock, for the dataset's businesses (python3 data/fonecta-connect-suggests-2026/mock_api/server.py).
+# Without it, approved changes to them are saved here but not published.
+# YEXT_MOCK_URL=http://localhost:8787
 # WhatsApp Cloud API. The phone number id is on the Meta app's WhatsApp > API Setup page.
 # WHATSAPP_TOKEN=
 # WHATSAPP_PHONE_NUMBER_ID=

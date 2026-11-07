@@ -1,14 +1,21 @@
 import 'server-only';
+import { eq } from 'drizzle-orm';
+import { entity } from '~/db/schema';
 import { weekToText } from '~/lib/hours';
+import { db } from '~/server/db';
 import { whatsappEnabled } from '~/server/whatsapp';
-import { yextEnabled } from '~/server/yext';
+import { publishes } from '~/server/yext';
 import { getBusiness } from '~/services/business.service';
 import { buildMessage, sendable } from '~/services/contact.service';
 import { builtInSources, listLinkedSources } from '~/services/sources.service';
 import { listSuggestions, upcomingExceptions } from '~/services/suggestions.service';
+import { syncYextBusiness } from '~/services/yext-business.service';
 
 /** Everything the dashboard shows for one business, or null when it no longer exists. */
 export async function getWorkspace(entityId: string, origin: string) {
+  // A business from the Yext account shows what Yext has now, including changes made there directly.
+  const [copy] = await db.select({ split: entity.split }).from(entity).where(eq(entity.id, entityId));
+  if (copy?.split === 'yext') await syncYextBusiness(entityId);
   const business = await getBusiness(entityId);
   if (!business) return null;
 
@@ -26,6 +33,7 @@ export async function getWorkspace(entityId: string, origin: string) {
   return {
     business: {
       id: business.id,
+      source: business.source,
       name: business.name,
       category: business.category,
       addressLine1: business.addressLine1,
@@ -61,7 +69,7 @@ export async function getWorkspace(entityId: string, origin: string) {
         url: message.url,
       },
     },
-    publishing: yextEnabled(),
+    publishing: publishes(business.source),
   };
 }
 export type WorkspaceData = NonNullable<Awaited<ReturnType<typeof getWorkspace>>>;

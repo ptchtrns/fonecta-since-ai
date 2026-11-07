@@ -1,7 +1,14 @@
 import { createSignal, For, Show } from 'solid-js';
 import { apiGet } from '~/lib/api';
 
-export type BusinessOption = { id: string; name: string; address: string; city: string };
+/** `yext`: from the team's Yext account, where changes really go. `dataset`: from the hackathon's synthetic data. */
+export type BusinessOption = {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  source: 'dataset' | 'yext';
+};
 
 const SEARCH_DELAY_MS = 150;
 
@@ -134,9 +141,14 @@ export function BusinessCombobox(props: { error?: string; onSelect?: (option: Bu
                   onMouseEnter={() => setActive(i())}
                   onClick={() => choose(option)}
                 >
-                  <div class="truncate font-medium">{option.name}</div>
+                  <div class="flex items-center gap-2">
+                    <span class="truncate font-medium">{option.name}</span>
+                    <Show when={option.source === 'yext'}>
+                      <span class="badge shrink-0 badge-outline badge-xs badge-primary">Yext</span>
+                    </Show>
+                  </div>
                   <div class="truncate text-sm text-base-content/60">
-                    {option.address}, {option.city}
+                    {[option.address, option.city].filter(Boolean).join(', ')}
                   </div>
                 </li>
               )}

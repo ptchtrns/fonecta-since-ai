@@ -18,7 +18,7 @@ WEB_APP = Path(__file__).parents[1] / "web"
 def save_predictions(predictions, target):
     """Replace the prediction table in the "local" or "remote" database with these predictions."""
     if target == "remote":
-        predictions = only_demo_businesses(predictions)
+        predictions = only_shown_businesses(predictions)
 
     with tempfile.NamedTemporaryFile("w", suffix=".sql", encoding="utf-8") as file:
         file.write("DELETE FROM prediction;\n")
@@ -37,10 +37,10 @@ def save_predictions(predictions, target):
     print(f"Saved {len(predictions)} predictions to the {target} database")
 
 
-def only_demo_businesses(predictions):
-    """The deployed database only has the demo businesses, so the others have nowhere to go."""
-    demo = {row["id"] for row in database().execute("SELECT id FROM entity WHERE split = 'demo'")}
-    return [prediction for prediction in predictions if prediction["question"]["entity_id"] in demo]
+def only_shown_businesses(predictions):
+    """The deployed database only has the demo businesses and those from Yext, so the others have nowhere to go."""
+    shown = {row["id"] for row in database().execute("SELECT id FROM entity WHERE split IN ('demo', 'yext')")}
+    return [prediction for prediction in predictions if prediction["question"]["entity_id"] in shown]
 
 
 def insert_statement(prediction):
@@ -55,7 +55,11 @@ def insert_statement(prediction):
         json.dumps(prediction["reasons"], ensure_ascii=False),
     ]
     columns = "entity_id, date, day_key, action, shown_hours, hours, confidence, reasons"
-    return f"INSERT INTO prediction ({columns}) VALUES ({', '.join(map(sql_value, values))});\n"
+    # A business from Yext may not have been taken on in the other database yet.
+    exists = f"SELECT 1 FROM entity WHERE id = {sql_value(values[0])}"
+    return (
+        f"INSERT INTO prediction ({columns}) SELECT {', '.join(map(sql_value, values))} WHERE EXISTS ({exists});\n"
+    )
 
 
 def sql_value(value):

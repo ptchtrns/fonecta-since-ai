@@ -19,7 +19,7 @@ import { t } from '~/lib/messages';
 import { err, ok } from '~/lib/result';
 import type { DecidePayload } from '~/schemas/business.schema';
 import { db } from '~/server/db';
-import { putEntity, yextEnabled } from '~/server/yext';
+import { updateEntity } from '~/server/yext';
 import { getBusiness, liveSites, withApproved, type Business } from '~/services/business.service';
 
 export const FLAG_KEY = 'closed-for-good';
@@ -300,13 +300,12 @@ export async function decide(entityId: string, key: string, input: DecidePayload
 
   let published = false;
   if (publishes) {
-    const result = await putEntity(entityId, {
-      // The whole hours object: sending only holidayHours would risk wiping weekday hours on the real API.
-      hours: {
-        ...business.hours,
-        holidayHours: withApproved(business.hours.holidayHours ?? [], [{ date: key, hours: hours! }]),
-      },
-    });
+    // Only this date changes, on top of the hours Yext has now: Yext replaces the whole hours object, so sending
+    // only holidayHours would risk wiping weekday hours, and sending this app's copy could undo changes made there.
+    const result = await updateEntity(business.source, entityId, {}, (now) => ({
+      ...now,
+      holidayHours: withApproved(now.holidayHours ?? [], [{ date: key, hours: hours! }]),
+    }));
     if (result.error) return err({ reason: 'YextRejected' as const, message: result.error });
     published = result.sent;
   }
@@ -329,7 +328,7 @@ export async function decide(entityId: string, key: string, input: DecidePayload
   const decision: Decision = {
     status,
     hours,
-    sites: publishes && yextEnabled() ? await liveSites(entityId) : null,
+    sites: published ? await liveSites(business) : null,
   };
   return ok({ decision, item, business });
 }

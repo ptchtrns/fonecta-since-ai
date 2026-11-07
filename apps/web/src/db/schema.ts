@@ -128,13 +128,15 @@ export const job = sqliteTable(
 // business with no offset, so they stay as text rather than becoming epochs. Only review times, which are
 // epoch ms in the source, use timestamp_ms.
 
-const countries = ['FI', 'SE', 'NO'] as const;
+export const countries = ['FI', 'SE', 'NO'] as const;
 export const languages = ['fi', 'sv', 'nb', 'en'] as const;
 export type Language = (typeof languages)[number];
 /** How pressing a suggestion is. See `importanceLabel`. */
 export const importances = ['low', 'medium', 'high'] as const;
 const contactChannels = ['EMAIL', 'SMS', 'WHATSAPP', 'APP_PUSH'] as const;
-const entitySplits = ['dev', 'test', 'demo', 'reference'] as const;
+// `yext`: a business from the team's Yext account rather than the dataset, added when someone takes it on. Not in
+// any dataset file, so a reseed removes it and the app adds it again from Yext.
+const entitySplits = ['dev', 'test', 'demo', 'reference', 'yext'] as const;
 const cityTiers = ['capital', 'large_city', 'town', 'ski_resort'] as const;
 const dayTypes = [
   'PUBLIC_HOLIDAY',
@@ -290,7 +292,7 @@ export const peerBenchmark = sqliteTable(
   (t) => [primaryKey({ columns: [t.country, t.cityTier, t.segment, t.dayKey] })],
 );
 
-// Businesses and shopping centres. `split` comes from data/splits.csv.
+// Businesses and shopping centres. `split` comes from data/splits.csv, except for businesses from Yext.
 export const entity = sqliteTable(
   'entity',
   {

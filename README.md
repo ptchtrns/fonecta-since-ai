@@ -16,7 +16,9 @@ python3 apps/predictor/run.py --save local    # also show the 2026 predictions o
 
 Demo: TODO
 
-To see the whole loop locally, start the web app (`pnpm dev`) and sign up at `/login?mode=sign-up`, choosing one of the demo businesses from the list. To publish approved hours to the dataset's Yext mock, run `python3 data/fonecta-connect-suggests-2026/mock_api/server.py` and set `YEXT_API_URL` in `apps/web/.dev.vars`. The mock only accepts changes to hours and name, so edits to other business details show its error.
+To see the whole loop locally, start the web app (`pnpm dev`) and sign up at `/login?mode=sign-up`, choosing one of the demo businesses from the list. To publish approved hours to the dataset's Yext mock, run `python3 data/fonecta-connect-suggests-2026/mock_api/server.py` and set `YEXT_MOCK_URL` in `apps/web/.dev.vars`. The mock only accepts changes to hours and name, so edits to other business details show its error.
+
+With `YEXT_API_URL` and `YEXT_API_KEY` set to the team's Yext sandbox, the sandbox's businesses are in the list too, marked "Yext". Their changes go to the real Yext API. Run the predictor with `--save local` after taking one on, so it gets suggestions.
 
 ## The five steps
 
@@ -24,7 +26,7 @@ To see the whole loop locally, start the web app (`pnpm dev`) and sign up at `/l
 - **Suggest:** the dashboard lists a business's suggestions with the reasons, most important first: how sure the predictor is, how many Google views that day had last season, and how soon it is. Each is also compared with pages the owner linked under Sources.
 - **Contact:** WhatsApp, in the owner's language, one suggestion at a time. The next goes out after the previous is answered. A suggestion that a linked page disagrees with is never sent.
 - **Owner decides (no login):** the message has Approve, Edit and No thanks buttons and a link to a page that needs no login. The token in the link only answers that one suggestion. The dashboard offers the same three answers.
-- **Apply + confirm:** an approved change is written to Yext as the full hours object, and the owner is told which sites show it and how soon. If Yext rejects it nothing is recorded, so the suggestion stays open. Without a Yext connection the decision is saved and the UI says it isn't live yet. Standing permission applies public holidays without asking when the predictor is at least 70% sure and no linked page disagrees.
+- **Apply + confirm:** an approved change is written to Yext. Yext replaces the whole hours object, so the app reads the hours Yext has now and changes only the approved date. The owner is told which sites show it and how soon: for the sandbox's businesses the sites come from Yext's Listings API. If Yext rejects it nothing is recorded, so the suggestion stays open. Without a Yext connection the decision is saved and the UI says it isn't live yet. Standing permission applies public holidays without asking when the predictor is at least 70% sure and no linked page disagrees.
 
 ## Data sources that mattered most (3–5)
 
@@ -88,7 +90,14 @@ After standing permission:
 
 ## Bonus: live source
 
-TODO
+**Replaced:** `entities.json` and `listings.json`, for the businesses in the team's Yext sandbox (Knowledge Graph *Entities* and *Listings*). They show up in the business search next to the dataset's. Taking one on copies it into the database, so the dashboard and the predictor treat it like any other business, and it is read from Yext again each time its dashboard opens. Approved changes go back to the sandbox. A real write was tested on Business Lunch House: Christmas Eve changed, the weekdays and the other dates stayed as they were, and the confirmation listed the 11 live sites. The hours were then put back as they were.
+
+What we learned:
+
+- **Coverage:** the account has two locations, both in Tampere. Business Lunch House has weekly hours and five holiday dates already entered for Christmas to Epiphany. The Boys Club has no hours at all.
+- **Quality:** Fonecta's category id (`R21005287`) isn't one of the dataset's types. The type is guessed from the name and description, and "lunch" makes Business Lunch House a lunch restaurant. The type decides which similar businesses the predictor compares with.
+- **Listings:** 11 publishers are live: Google, Facebook, Bing, Foursquare, HERE, MapQuest, Navmii, ShowMeLocal, TomTom, Tupalo and WhereTo. Google and Facebook say `NOT_CONNECTED`, meaning the owner's own accounts aren't linked. There are no Nordic directories and no Apple Maps. The API gives no update speeds, so "shows it within…" uses the dataset's figures where it has the publisher and three days otherwise.
+- **Gaps:** no reviews, no publisher suggestions and no exception-hour history. Analytics reports answered with an internal server error. So nothing tells the predictor what this owner did before, and it relies on what similar businesses do: Business Lunch House gets one suggestion, Christmas Eve.
 
 ## Third-party code, data and licences
 
