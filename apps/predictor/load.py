@@ -19,7 +19,7 @@ from hours import published_breaks
 
 D1_FOLDER = Path(__file__).parents[1] / "web" / ".wrangler" / "state" / "v3" / "d1" / "miniflare-D1DatabaseObject"
 ALL_BUSINESSES = 3032
-HOW_TO_FILL = "Fill it from the repo root with: pnpm db:migrate && pnpm db:seed:full"
+HOW_TO_FILL = "Fill it from the repo root with: pnpm db:migrate && pnpm db:seed"
 
 
 def load_everything(snapshot):
@@ -287,7 +287,7 @@ def database():
     except sqlite3.OperationalError as error:
         raise SystemExit(f"Can't read the database at {path} ({error}). {HOW_TO_FILL}")
 
-    # The demo set would quietly give worse guesses and overwrite predictions_2026.csv with a tiny file.
+    # The limited set would quietly give worse guesses and overwrite predictions_2026.csv with a tiny file.
     if businesses < ALL_BUSINESSES or not has_training_data:
         raise SystemExit(f"The database holds {businesses} businesses, not the full dataset. {HOW_TO_FILL}")
     return connection

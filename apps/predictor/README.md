@@ -2,14 +2,14 @@
 
 Decides, for every business and special day from 7 Nov 2026 to 6 Jan 2027, whether to **suggest** new hours, **flag** the business for a human, or **do nothing**. Its output is `predictions_2026.csv`, which the organisers score.
 
-Plain Python, standard library only. Reads the web app's local database (`apps/web/.wrangler`), loaded with the full dataset. It stops with an error if that database holds only the 32 demo businesses, because the demo set has no training data and would overwrite `predictions_2026.csv` with a tiny file.
+Plain Python, standard library only. Reads the web app's local database (`apps/web/.wrangler`), loaded with the full dataset. It stops with an error if that database holds only the 32 businesses of the limited set (`pnpm db:seed:limited`), because that set has no training data and would overwrite `predictions_2026.csv` with a tiny file.
 
 ## Run it
 
 From the repo root, once per clone and after any reseed (needs Node, pnpm and uv, see `docs/DEVELOPMENT.md`):
 
 ```sh
-pnpm install && pnpm db:migrate && pnpm db:seed:full
+pnpm install && pnpm db:migrate && pnpm db:seed
 ```
 
 Then:

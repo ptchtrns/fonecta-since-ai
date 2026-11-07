@@ -7,7 +7,7 @@ Our entry for the Fonecta challenge at Since AI Hackathon 2026. For setting up a
 Predictions (Python 3.9+, standard library only), from the repo root. They read the local database, so fill that first (needs Node, pnpm and uv):
 
 ```sh
-pnpm install && pnpm db:migrate && pnpm db:seed:full
+pnpm install && pnpm db:migrate && pnpm db:seed
 
 python3 apps/predictor/run.py                 # 2026 season → predictions_2026.csv + score on dev businesses
 python3 apps/predictor/run.py --season 2025   # back-test as if today were 6 Nov 2025

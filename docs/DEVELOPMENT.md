@@ -107,21 +107,21 @@ If a new server-side package shows up in dev as "file does not exist ... optimiz
 
 ```sh
 pnpm db:migrate
-pnpm db:seed                       # demo set, local
-pnpm db:seed:full                  # everything, local
-pnpm --filter web db:seed:remote   # demo set, deployed database
+pnpm db:seed                       # everything, local
+pnpm db:seed:limited               # limited set, local
+pnpm --filter web db:seed:remote   # limited set, deployed database
 ```
 
 Each run empties and refills the dataset tables and leaves app tables alone, except `prediction`, which is emptied along with the businesses. Run the predictor with `--save` again afterwards.
 
-| Load     | Businesses | Rows | Size   | Est. rows written |
-| -------- | ---------- | ---- | ------ | ----------------- |
-| Demo set | 32         | 29k  | 3.4 MB | 61k               |
-| Full     | 3,032      | 3.5M | 272 MB | over 7M           |
+| Load    | Businesses | Rows | Size   | Est. rows written |
+| ------- | ---------- | ---- | ------ | ----------------- |
+| Full    | 3,032      | 3.5M | 272 MB | over 7M           |
+| Limited | 32         | 29k  | 3.4 MB | 61k               |
 
-The demo set is the 17 demo businesses and 15 shopping centres. It keeps their full holiday history and reviews, limits analytics and daily weather to 1 Nov 2025 onwards, and limits weather and peer data to what they use. It has no `dev` or `test` businesses, so `dev_truth_history` stays empty and the 2025 back-test targets aren't loaded. Work across all businesses, such as producing `predictions_2026.csv`, needs the full load: `apps/predictor` reads it from the local database and refuses to run on the demo set.
+The limited set is the 17 demo businesses and 15 shopping centres. It keeps their full holiday history and reviews, limits analytics and daily weather to 1 Nov 2025 onwards, and limits weather and peer data to what they use. It has no `dev` or `test` businesses, so `dev_truth_history` stays empty and the 2025 back-test targets aren't loaded. Work across all businesses, such as producing `predictions_2026.csv`, needs the full load: `apps/predictor` reads it from the local database and refuses to run on the limited set.
 
-D1's free plan allows [100,000 written rows a day](https://developers.cloudflare.com/d1/platform/limits/), and indexes count as writes. The demo set fits once a day. A second load on the same day probably won't, because deleting the old rows counts too. The full load needs the paid plan.
+D1's free plan allows [100,000 written rows a day](https://developers.cloudflare.com/d1/platform/limits/), and indexes count as writes. That is why deployments get the limited set, which fits once a day. A second load on the same day probably won't, because deleting the old rows counts too. Loading everything into a deployed database needs the paid plan and a direct `import_connect_data.py --remote` run.
 
 The only answers loaded are in `dev_truth_history`, which the predictor uses as training data, only for days before the snapshot. The scorer's labels and the owner simulator's data stay in the dataset's files, where `evaluate.py` and `mock_api` read them.
 
@@ -148,16 +148,16 @@ Manual deploy: `pnpm db:migrate:remote` (from `apps/web`) and `pnpm deploy`.
 
 ## Scripts
 
-| Command             | What it does                                 |
-| ------------------- | -------------------------------------------- |
-| `pnpm dev`          | Dev server for apps/web                      |
-| `pnpm build`        | Production build                             |
-| `pnpm check`        | Format check, lint and type-aware checks     |
-| `pnpm db:generate`  | Generate a migration from `src/db/schema.ts` |
-| `pnpm db:migrate`   | Apply migrations locally                     |
-| `pnpm db:seed`      | Load the Connect demo set into local D1      |
-| `pnpm db:seed:full` | Load the whole Connect dataset into local D1 |
-| `pnpm deploy`       | Build and deploy with wrangler               |
+| Command                | What it does                                 |
+| ---------------------- | -------------------------------------------- |
+| `pnpm dev`             | Dev server for apps/web                      |
+| `pnpm build`           | Production build                             |
+| `pnpm check`           | Format check, lint and type-aware checks     |
+| `pnpm db:generate`     | Generate a migration from `src/db/schema.ts` |
+| `pnpm db:migrate`      | Apply migrations locally                     |
+| `pnpm db:seed`         | Load the whole Connect dataset into local D1 |
+| `pnpm db:seed:limited` | Load the limited Connect set into local D1   |
+| `pnpm deploy`          | Build and deploy with wrangler               |
 
 In `apps/web`, `pnpm cf-typegen` regenerates `worker-configuration.d.ts` after changing `wrangler.jsonc`, and `pnpm preview` runs the production build locally.
 
