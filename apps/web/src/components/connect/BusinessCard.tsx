@@ -64,7 +64,17 @@ export function BusinessCard(props: { business: Workspace['business'] }) {
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <h1 class="text-xl font-semibold tracking-tight text-balance">{b().name}</h1>
-            <p class="text-sm text-base-content/60">{b().category}</p>
+            <p class="flex items-center gap-2 text-sm text-base-content/60">
+              {b().category}
+              <Show when={b().source === 'yext'}>
+                <span
+                  class="badge badge-outline badge-xs badge-primary"
+                  title="Changes go to the team's Yext account"
+                >
+                  Yext
+                </span>
+              </Show>
+            </p>
           </div>
           <button type="button" class="btn btn-sm btn-ghost border-base-300" onClick={openEditor}>
             Edit

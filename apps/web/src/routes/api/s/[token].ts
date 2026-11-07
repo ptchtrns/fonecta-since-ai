@@ -27,7 +27,7 @@ export async function GET(event: ApiEvent) {
       // How many people are expected to look the business up that day, for the impact line.
       views: item?.views ?? null,
       // Only what really went out: without a Yext connection a decision is saved, not published.
-      sites: state.publishedAt ? await liveSites(business.id) : null,
+      sites: state.publishedAt ? await liveSites(business) : null,
     },
   });
 }

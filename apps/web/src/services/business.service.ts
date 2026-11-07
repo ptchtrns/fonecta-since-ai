@@ -17,13 +17,10 @@ import { WEEKDAYS, textToDay, weekToText } from '~/lib/hours';
 import { ok, err } from '~/lib/result';
 import type { BusinessEditPayload } from '~/schemas/business.schema';
 import { db } from '~/server/db';
-import { putEntity } from '~/server/yext';
+import { liveListings, updateEntity, type BusinessSource } from '~/server/yext';
+import { fold, searchYextBusinesses, syncYextBusiness } from '~/services/yext-business.service';
 
 const MAX_RESULTS = 20;
-
-/** Lower case without Nordic letters' marks, so "kipina" finds "Kahvila Kipinä". */
-const fold = (text: string) =>
-  text.toLowerCase().replaceAll('ä', 'a').replaceAll('ö', 'o').replaceAll('å', 'a').replaceAll('ø', 'o');
 
 // SQLite's lower() only handles ASCII, so capitals are replaced as well.
 const foldColumn = (column: AnySQLiteColumn): SQL =>
@@ -31,9 +28,14 @@ const foldColumn = (column: AnySQLiteColumn): SQL =>
 
 const selectable = and(ne(entity.split, 'reference'), eq(entity.closed, false));
 
-/** The combobox on the sign-up form. An empty search lists the demo businesses. */
+/**
+ * The combobox on the sign-up form: the Yext account's businesses first, then the dataset's. An empty search lists
+ * the account's businesses and the dataset's demo businesses.
+ */
 export async function searchBusinesses(q: string) {
   const words = fold(q).split(/\s+/).filter(Boolean);
+  // Copies of the account's businesses are in `entity` too, but Yext has the current names.
+  const fromYext = (await searchYextBusinesses(words)).slice(0, MAX_RESULTS);
   const matches = words.map((word) => {
     const like = `%${word.replace(/[%_\\]/g, '\\$&')}%`;
     return sql`(${foldColumn(entity.name)} LIKE ${like} ESCAPE '\\' OR ${foldColumn(entity.city)} LIKE ${like} ESCAPE '\\' OR ${foldColumn(entity.addressLine1)} LIKE ${like} ESCAPE '\\')`;
@@ -46,18 +48,25 @@ export async function searchBusinesses(q: string) {
       city: entity.city,
     })
     .from(entity)
-    .where(and(selectable, ...(words.length ? matches : [eq(entity.split, 'demo')])))
+    .where(
+      and(selectable, ne(entity.split, 'yext'), ...(words.length ? matches : [eq(entity.split, 'demo')])),
+    )
     .orderBy(desc(sql`${entity.split} = 'demo'`), asc(entity.name))
-    .limit(MAX_RESULTS);
-  return ok(rows);
+    .limit(MAX_RESULTS - fromYext.length);
+  return ok([...fromYext, ...rows.map((r) => ({ ...r, source: 'dataset' as const }))]);
 }
 
+/** Whether an account can take on this business. One from the Yext account is copied in, or refreshed, here. */
 export async function isSelectableBusiness(entityId: string) {
-  const [row] = await db
-    .select({ id: entity.id })
-    .from(entity)
-    .where(and(eq(entity.id, entityId), selectable));
-  return !!row;
+  const find = () =>
+    db
+      .select({ split: entity.split })
+      .from(entity)
+      .where(and(eq(entity.id, entityId), selectable));
+  const [row] = await find();
+  if (row && row.split !== 'yext') return true;
+  if (!(await syncYextBusiness(entityId))) return false;
+  return (await find()).length > 0;
 }
 
 /** The first time someone takes on a business: its settings start from what the dataset knows about the owner. */
@@ -90,6 +99,13 @@ export function withApproved(existing: HolidayHours[], approved: { date: string;
 
 /** The business as customers should see it: the dataset's values with the owner's edits on top. */
 export async function getBusiness(entityId: string) {
+  const business = await readBusiness(entityId);
+  // A reseed removes businesses that came from Yext. They come back from Yext the next time someone needs them.
+  if (business || !(await syncYextBusiness(entityId))) return business;
+  return readBusiness(entityId);
+}
+
+async function readBusiness(entityId: string) {
   const [row] = await db
     .select({
       entity,
@@ -119,6 +135,7 @@ export async function getBusiness(entityId: string) {
   const e = row.entity;
   return {
     id: e.id,
+    source: (e.split === 'yext' ? 'yext' : 'dataset') as BusinessSource,
     name: edits.name ?? e.name,
     category: row.categoryName,
     addressLine1: edits.addressLine1 ?? e.addressLine1,
@@ -153,13 +170,14 @@ export async function getBusiness(entityId: string) {
 export type Business = NonNullable<Awaited<ReturnType<typeof getBusiness>>>;
 
 /** Sites the listing is live on, fastest first, with how long a change takes to show there. */
-export async function liveSites(entityId: string) {
-  const rows = await db
+export async function liveSites(business: Pick<Business, 'id' | 'source'>) {
+  // The dataset has listings for its own businesses. For the account's, Yext itself says where they show.
+  if (business.source === 'yext') return (await liveListings('yext', business.id)) ?? [];
+  return db
     .select({ name: listing.publisherName, seconds: listing.typicalUpdateSpeedSeconds })
     .from(listing)
-    .where(and(eq(listing.entityId, entityId), eq(listing.status, 'LIVE')))
+    .where(and(eq(listing.entityId, business.id), eq(listing.status, 'LIVE')))
     .orderBy(asc(listing.typicalUpdateSpeedSeconds));
-  return rows;
 }
 
 const withScheme = (url: string) => (/^https?:\/\//i.test(url) ? url : `https://${url}`);
@@ -189,12 +207,21 @@ export async function saveBusiness(entityId: string, input: BusinessEditPayload)
       countryCode: current.country,
     };
   }
-  // The whole hours object: sending only some days would risk wiping the others on the real API.
-  if (hoursChanged) body.hours = { ...current.hours, ...hours };
-  if (!Object.keys(body).length) return ok({ changed: false, published: false });
+  if (!hoursChanged && !Object.keys(body).length) return ok({ changed: false, published: false });
 
-  const yext = await putEntity(entityId, body);
+  // Yext replaces the whole hours object, so the new weekdays go on top of the hours Yext has now.
+  const yext = await updateEntity(
+    current.source,
+    entityId,
+    body,
+    hoursChanged ? (now) => ({ ...now, ...hours }) : undefined,
+  );
   if (yext.error) return err({ reason: 'YextRejected' as const, message: yext.error });
+  // Yext keeps the account's businesses, so the copy here is refreshed instead of keeping edits on top of it.
+  if (current.source === 'yext' && yext.sent) {
+    await syncYextBusiness(entityId);
+    return ok({ changed: true, published: true });
+  }
 
   const edits: BusinessEdits = {
     name: input.name,

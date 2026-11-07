@@ -56,6 +56,27 @@ def load_questions(season):
     ).fetchall()
 
 
+def load_yext_questions(season):
+    """The season's special days for businesses taken on from the team's Yext account.
+
+    They aren't in the organisers' targets, so they get every holiday, eve and commercial day that the targets
+    ask about in their country. Local events and school breaks are left out: they belong to particular cities.
+    """
+    return database().execute(
+        """SELECT business.id AS entity_id, days.date, days.day_key
+           FROM entity business
+           JOIN (SELECT DISTINCT target.country, target.date, target.day_key
+                 FROM evaluation_target target
+                 JOIN calendar_special_day calendar
+                   ON calendar.country = target.country AND calendar.date = target.date
+                 WHERE target.season = ?) days
+             ON days.country = business.country
+           WHERE business.split = 'yext'
+           ORDER BY business.id, days.date""",
+        (season,),
+    ).fetchall()
+
+
 def load_businesses():
     """Every business and shopping centre by business ID, in the shape of the Yext entity they came from."""
     businesses = {}
