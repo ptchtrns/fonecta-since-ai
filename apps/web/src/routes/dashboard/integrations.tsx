@@ -4,7 +4,7 @@ import { createMemo, createSignal, For, onSettled, Show } from 'solid-js';
 import { FormField } from '~/components/FormField';
 import { FormMessage } from '~/components/FormMessage';
 import { Page, PageHeader, Panel } from '~/components/connect/Page';
-import { BrandMark } from '~/components/connect/PublisherLogo';
+import { BrandMark, PublisherLogo } from '~/components/connect/PublisherLogo';
 import { WhatsAppPreview } from '~/components/connect/WhatsAppPreview';
 import type { Language } from '~/db/schema';
 import { meetsImportance, type Importance } from '~/lib/importance';
@@ -35,6 +35,16 @@ const levels: { value: Importance; title: string; text: string }[] = [
     title: 'Everything',
     text: 'Low ones too: unsure guesses, days few people look you up, days far ahead.',
   },
+];
+
+// Placeholders: channels owners may ask for. Nothing behind them yet, so no settings, toggles or buttons.
+const plannedChannels: { name: string; logo: string; text: string }[] = [
+  { name: 'Text message', logo: 'SMS', text: 'For owners who don’t use a messaging app.' },
+  { name: 'Email', logo: 'Email', text: 'Suggestions in your inbox.' },
+  { name: 'Messenger', logo: 'Messenger', text: 'Answer where your Facebook page’s messages already arrive.' },
+  { name: 'Telegram', logo: 'Telegram', text: 'Answer suggestions with one tap in Telegram.' },
+  { name: 'Signal', logo: 'Signal', text: 'Answer suggestions in Signal.' },
+  { name: 'Viber', logo: 'Viber', text: 'Answer suggestions in Viber.' },
 ];
 
 /** The settings as the form holds them. Phones are compared without spaces, as the server stores them. */
@@ -312,6 +322,23 @@ export default function Integrations() {
             </div>
           </details>
         </form>
+      </Panel>
+
+      <Panel title="Other channels" subtitle="Not available yet. WhatsApp is the only one for now.">
+        <ul class="flex flex-col divide-y divide-base-300">
+          <For each={plannedChannels}>
+            {(channel) => (
+              <li class="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <PublisherLogo name={channel.logo} size="sm" />
+                <div class="min-w-0 flex-1">
+                  <h3 class="font-medium">{channel.name}</h3>
+                  <p class="text-sm text-base-content/60">{channel.text}</p>
+                </div>
+                <span class="badge badge-ghost badge-sm">Coming soon</span>
+              </li>
+            )}
+          </For>
+        </ul>
       </Panel>
     </Page>
   );
