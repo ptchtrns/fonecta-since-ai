@@ -97,147 +97,159 @@ export default function Integrations() {
           </Show>
           <FormMessage message={form.message()} />
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <FormField label="WhatsApp number" error={form.fieldErrors().phone}>
+          <div class="flex flex-col gap-1.5">
+            <label for="whatsapp-phone" class="font-medium">
+              WhatsApp number
+            </label>
+            <div class="flex gap-2">
               <input
+                id="whatsapp-phone"
                 name="phone"
                 type="tel"
-                class="input w-full"
+                class="input min-w-0 flex-1"
                 placeholder="+358 40 123 4567"
                 defaultValue={whatsapp().phone}
                 autocomplete="tel"
               />
-            </FormField>
-            <FormField label="Message language">
-              <select name="language" class="select w-full">
-                <For each={Object.keys(languageNames) as Language[]}>
-                  {(language) => (
-                    <option value={language} selected={whatsapp().language === language}>
-                      {languageNames[language]}
-                    </option>
-                  )}
-                </For>
-              </select>
-            </FormField>
-          </div>
-
-          <label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
-            <input name="on" type="checkbox" class="toggle mt-0.5" checked={whatsapp().on} />
-            <span>
-              <span class="block font-medium">Send me suggestions on WhatsApp</span>
-              <span class="text-sm text-base-content/60">
-                One at a time, the most important first. The next comes after you've answered.
-              </span>
-            </span>
-          </label>
-          <fieldset class="flex flex-col gap-2">
-            <legend class="font-medium">Which suggestions to send</legend>
-            <p class="text-sm text-base-content/60">
-              Every suggestion has a level. The rest wait for you on the dashboard.
-            </p>
-            <div class="grid gap-2 sm:grid-cols-3">
-              <For each={levels}>
-                {(option) => (
-                  <label
-                    class={[
-                      'flex cursor-pointer flex-col gap-1 rounded-box border p-3',
-                      level() === option.value ? 'border-base-content' : 'border-base-300',
-                    ]}
-                  >
-                    <span class="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="minImportance"
-                        value={option.value}
-                        class="radio radio-sm"
-                        checked={level() === option.value}
-                        onChange={() => setPicked(option.value)}
-                      />
-                      <span class="font-medium">{option.title}</span>
-                    </span>
-                    <span class="text-sm text-base-content/60">{option.text}</span>
-                    <span class="mt-auto pt-1 text-xs text-base-content/50">
-                      {sentAt(option.value)} of {waiting().length} waiting now
-                    </span>
-                  </label>
-                )}
-              </For>
-            </div>
-            <details class="text-sm text-base-content/70">
-              <summary class="cursor-pointer text-xs text-base-content/50 select-none">
-                How levels work
-              </summary>
-              <div class="mt-2 flex flex-col gap-2">
-                <p>
-                  A suggestion matters more the likelier it is to be right, the more people look you up on
-                  Google that day, and the sooner the day is. Days within a week count double, within a month
-                  a quarter more.
-                </p>
-                <p>
-                  Levels compare your suggestions with each other. Your most pressing upcoming day is High,
-                  and so is anything at least two thirds as pressing. Medium is at least a third, Low is the
-                  rest. So a suggestion can move up as its day gets close.
-                </p>
-                <p>
-                  Days a page you linked disagrees with, and the question whether you've closed for good, are
-                  never sent: they wait on the dashboard.
-                </p>
-              </div>
-            </details>
-          </fieldset>
-
-          <label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
-            <input
-              name="standingPermission"
-              type="checkbox"
-              class="toggle mt-0.5"
-              checked={whatsapp().standingPermission}
-            />
-            <span>
-              <span class="block font-medium">Handle public holidays without asking</span>
-              <span class="text-sm text-base-content/60">
-                We update them when we're at least 70% sure and no linked page disagrees, then tell you what
-                changed.
-              </span>
-            </span>
-          </label>
-
-          <FormMessage message={test.message()} />
-          <div class="flex flex-wrap justify-end gap-2">
-            <Show when={whatsapp().configured && whatsapp().phone}>
-              <button type="button" class="btn btn-ghost" disabled={test.pending()} onClick={sendTest}>
-                Send test message
+              <button type="submit" class="btn btn-primary" disabled={form.pending()}>
+                <Show when={form.pending()}>
+                  <span class="loading loading-spinner loading-sm" />
+                </Show>
+                Save
               </button>
+            </div>
+            <Show when={form.fieldErrors().phone}>
+              {(error) => <span class="text-error">{error()}</span>}
             </Show>
-            <button type="submit" class="btn btn-primary" disabled={form.pending()}>
-              <Show when={form.pending()}>
-                <span class="loading loading-spinner loading-sm" />
-              </Show>
-              Save
-            </button>
           </div>
+
+          <details class="collapse-arrow collapse rounded-box border border-base-300">
+            <summary class="collapse-title min-h-0 py-3 text-sm font-medium">More options</summary>
+            <div class="collapse-content flex flex-col gap-4">
+              <FormField label="Message language">
+                <select name="language" class="select w-full sm:w-1/2">
+                  <For each={Object.keys(languageNames) as Language[]}>
+                    {(language) => (
+                      <option value={language} selected={whatsapp().language === language}>
+                        {languageNames[language]}
+                      </option>
+                    )}
+                  </For>
+                </select>
+              </FormField>
+
+              <label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
+                <input name="on" type="checkbox" class="toggle mt-0.5" checked={whatsapp().on} />
+                <span>
+                  <span class="block font-medium">Send me suggestions on WhatsApp</span>
+                  <span class="text-sm text-base-content/60">
+                    One at a time, the most important first. The next comes after you've answered.
+                  </span>
+                </span>
+              </label>
+              <fieldset class="flex flex-col gap-2">
+                <legend class="font-medium">Which suggestions to send</legend>
+                <p class="text-sm text-base-content/60">
+                  Every suggestion has a level. The rest wait for you on the dashboard.
+                </p>
+                <div class="grid gap-2 sm:grid-cols-3">
+                  <For each={levels}>
+                    {(option) => (
+                      <label
+                        class={[
+                          'flex cursor-pointer flex-col gap-1 rounded-box border p-3',
+                          level() === option.value ? 'border-base-content' : 'border-base-300',
+                        ]}
+                      >
+                        <span class="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="minImportance"
+                            value={option.value}
+                            class="radio radio-sm"
+                            checked={level() === option.value}
+                            onChange={() => setPicked(option.value)}
+                          />
+                          <span class="font-medium">{option.title}</span>
+                        </span>
+                        <span class="text-sm text-base-content/60">{option.text}</span>
+                        <span class="mt-auto pt-1 text-xs text-base-content/50">
+                          {sentAt(option.value)} of {waiting().length} waiting now
+                        </span>
+                      </label>
+                    )}
+                  </For>
+                </div>
+                <details class="text-sm text-base-content/70">
+                  <summary class="cursor-pointer text-xs text-base-content/50 select-none">
+                    How levels work
+                  </summary>
+                  <div class="mt-2 flex flex-col gap-2">
+                    <p>
+                      A suggestion matters more the likelier it is to be right, the more people look you up on
+                      Google that day, and the sooner the day is. Days within a week count double, within a
+                      month a quarter more.
+                    </p>
+                    <p>
+                      Levels compare your suggestions with each other. Your most pressing upcoming day is
+                      High, and so is anything at least two thirds as pressing. Medium is at least a third,
+                      Low is the rest. So a suggestion can move up as its day gets close.
+                    </p>
+                    <p>
+                      Days a page you linked disagrees with, and the question whether you've closed for good,
+                      are never sent: they wait on the dashboard.
+                    </p>
+                  </div>
+                </details>
+              </fieldset>
+
+              <label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
+                <input
+                  name="standingPermission"
+                  type="checkbox"
+                  class="toggle mt-0.5"
+                  checked={whatsapp().standingPermission}
+                />
+                <span>
+                  <span class="block font-medium">Handle public holidays without asking</span>
+                  <span class="text-sm text-base-content/60">
+                    We update them when we're at least 70% sure and no linked page disagrees, then tell you
+                    what changed.
+                  </span>
+                </span>
+              </label>
+
+              <Show when={whatsapp().preview}>
+                {(preview) => (
+                  <div class="flex flex-col gap-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <h3 class="font-medium">Your next message</h3>
+                      <a
+                        href={preview().url}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="btn btn-ghost btn-sm border-base-300"
+                      >
+                        Open the answer page
+                      </a>
+                    </div>
+                    <WhatsAppPreview body={preview().body} buttons={preview().buttons} />
+                  </div>
+                )}
+              </Show>
+
+              <Show when={whatsapp().configured && whatsapp().phone}>
+                <FormMessage message={test.message()} />
+                <div class="flex justify-end">
+                  <button type="button" class="btn btn-ghost" disabled={test.pending()} onClick={sendTest}>
+                    Send test message
+                  </button>
+                </div>
+              </Show>
+            </div>
+          </details>
         </form>
       </Panel>
-
-      <Show when={whatsapp().preview}>
-        {(preview) => (
-          <Panel
-            title="Your next message"
-            action={
-              <a
-                href={preview().url}
-                target="_blank"
-                rel="noreferrer"
-                class="btn btn-ghost btn-sm border-base-300"
-              >
-                Open the answer page
-              </a>
-            }
-          >
-            <WhatsAppPreview body={preview().body} buttons={preview().buttons} />
-          </Panel>
-        )}
-      </Show>
     </Page>
   );
 }
