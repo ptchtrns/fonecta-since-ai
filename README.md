@@ -12,6 +12,7 @@ pnpm install && pnpm db:migrate && pnpm db:seed
 python3 apps/predictor/run.py                 # 2026 season → predictions_2026.csv + score on dev businesses
 python3 apps/predictor/run.py --season 2025   # back-test as if today were 6 Nov 2025
 python3 apps/predictor/run.py --save local    # also show the 2026 predictions on the dashboard
+uv run apps/predictor/train.py --check       # retrain the decider after changing a clue (needs scikit-learn, uv installs it)
 ```
 
 Demo: TODO
@@ -22,7 +23,7 @@ With `YEXT_API_URL` and `YEXT_API_KEY` set to the team's Yext sandbox, the sandb
 
 ## The five steps
 
-- **Detect:** `apps/predictor` compares what Google shows with what each business most likely does on every special day, using the business's own past entries, its shopping centre, similar businesses and customer reviews read by language models. Businesses that customers say have shut down for good are flagged for a person to check. See [apps/predictor/README.md](apps/predictor/README.md).
+- **Detect:** `apps/predictor` compares what Google shows with what each business most likely does on every special day. Clues propose hours and report their evidence: the business's own past entries, its shopping centre, similar businesses, how often its type closes, and customer reviews read by language models. A model trained on earlier seasons and the 2025 pilot's answers weighs the options and suggests one only when it expects it to be right more often than wrong. Businesses that customers say have shut down for good are flagged for a person to check. See [apps/predictor/README.md](apps/predictor/README.md).
 - **Suggest:** the dashboard lists a business's suggestions with the reasons, most important first: how sure the predictor is, how many Google views that day had last season, and how soon it is. Each is also compared with pages the owner linked under Sources.
 - **Contact:** WhatsApp, in the owner's language, one suggestion at a time. The next goes out after the previous is answered. A suggestion that a linked page disagrees with is never sent.
 - **Owner decides (no login):** the message has Approve, Edit and No thanks buttons and a link to a page that needs no login. The token in the link only answers that one suggestion. The dashboard offers the same three answers.
@@ -35,7 +36,7 @@ With `YEXT_API_URL` and `YEXT_API_KEY` set to the team's Yext sandbox, the sandb
 | Past holiday entries (`holiday_hours_history.jsonl`) | Suggest what the owner entered for the same holiday in earlier years; confidence from how many years agree, recent years counting more | Connect's own audit log of exception hours |
 | Published listing (`entities.json`) | What Google shows now, to tell which suggestions are needed and which would be needless | Yext Knowledge Graph *Entities* |
 | Shopping-centre hours (centres in `entities.json` and their history) | Shops inside a centre get the centre's exact hours for days the centre has published; this beats the shop's own last-year entry | Centres' own websites or their Yext feeds, usually published 4–8 weeks before Christmas |
-| Weekly hours history (`regular_hours_history.jsonl`) | Move last year's hours to this year's weekday, e.g. "normal opening, close at 17" | Connect's audit log of published hours |
+| What really happened, and owners' answers (`dev_truth_history.csv`, `pilot_decision_log_2025.csv`) | The decider learns from earlier seasons which suggestions turn out right and when to stay quiet. The pilot's approvals, edits and declines include businesses outside the training set | Every approve, edit and decline in Connect, plus what owners later entered themselves |
 | Peer benchmarks (`peer_benchmarks.csv`) | For businesses with no history: suggest "closed" when at least 20% of similar businesses close | Connect's own aggregated customer data |
 
 ## What we tried that didn't work
@@ -46,18 +47,21 @@ With `YEXT_API_URL` and `YEXT_API_KEY` set to the team's Yext sandbox, the sandb
 - **Applying peers' typical change to the business's own hours** (e.g. "cafés close 5 h early on Christmas Eve" applied to its own opening hours). Lowered the score in both seasons. Of 255 such suggestions, 212 went to owners who had simply kept their normal hours. Businesses without history almost always keep normal hours, so learning from owners who did enter something over-suggests changes.
 - **A small language model on a laptop for reading reviews.** `qwen3:1.7b` read Finnish "ovet olivat kiinni" (the doors were closed) as *open* every time.
 - **Asking the model for everything in one question.** When we asked for the closing time in the same question as "what did the customer find?", the model started inventing times and then answered "closed early" for reviews where the business was closed all day: 219 of 300 right instead of 293. Two short questions fixed it.
+- **Customer activity and owners' review replies as extra evidence.** On closed days customer actions drop (searches don't), and owners reply "we forgot to update our holiday hours" about 450 times. Both separate closers from the rest when looked at alone, but the decider got no better on businesses it never saw: the business type and the owner's own history already carry the same information.
+- **"Close" times as a hedge.** The scorer gives partial points for hours within 30 minutes, but true times are almost all on the hour and our misses were an hour or more off. A half-hour guess between two likely closing times never beats the likelier one.
 - **One reading model for all three countries.** Mistral-Small 24B reads Swedish and Norwegian well, but translated Finnish "Kiva että olitte auki" (glad you were open) as "I wish you had been open". Reviews of Finnish businesses now go to Qwen2.5-72B, which read all of those correctly.
 
 ## Customer with no history / no previous actions
 
 When an owner has never entered anything for a holiday, the predictor falls back to other evidence:
 
-- **How often the same type of business really closes** on that holiday in the same country, learned from the true hours of the training businesses. It suggests "closed" when at least 80% of them closed.
-- **What similar businesses entered** (same country, city size and type): "closed" when at least 20% of them entered closed.
+- **How often the same type of business really closes** on that holiday in the same country, learned from the true hours of the training businesses.
+- **What similar businesses entered** (same country, city size and type).
+- **How the owner behaves on other days**, if they have entered anything at all: how often they entered "closed", and how long ago.
 - **Recent reviews** where customers found the doors closed on that holiday, and **Google users' suggested hours** for the same holiday last time.
 - **Seasons and snow:** summer terraces in winter, ski rentals in summer, and ski rentals when there isn't enough snow.
 
-Otherwise it stays quiet, because owners with no history almost always keep their normal hours (see above). `FI-D0017` Kahvila Kipinä shows this: sign up with it and it gets four suggestions, all from those sources. TODO: show it in the demo.
+The clues report this evidence even when it's too weak for a guess of their own, and the decider, which learned from earlier seasons how often each combination turned out right, suggests only when it expects to be right more often than wrong. Usually it stays quiet, because owners with no history mostly keep their normal hours, and a wrong "closed" costs as much as a right one earns. `FI-D0017` Kahvila Kipinä shows this: sign up with it and it gets five suggestions, for example Epiphany closed because "54% of businesses like yours were closed on this day in earlier years", and nothing on the days where the evidence is weaker. TODO: show it in the demo.
 
 ## Final customer messages (as text)
 
@@ -104,7 +108,8 @@ What we learned:
 | Component | Licence |
 |---|---|
 | Connect Suggests simulator dataset, Since AI ry 2026 (`data/fonecta-connect-suggests-2026`) | Data CC BY 4.0, code MIT |
-| `apps/predictor` | Python standard library only |
+| `apps/predictor` | Python standard library only to run. Training the decider uses [scikit-learn](https://scikit-learn.org) and [NumPy](https://numpy.org) |
+| scikit-learn, NumPy | BSD 3-Clause |
 | Qwen2.5-72B-Instruct, used through Featherless to read reviews of Finnish businesses | Qwen licence (commercial use allowed below 100 million monthly users) |
 | Mistral-Small-24B-Instruct-2501, used through Featherless to read reviews of Swedish and Norwegian businesses | Apache 2.0 |
 | TODO: web app and worker dependencies | |

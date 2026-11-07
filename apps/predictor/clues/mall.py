@@ -38,6 +38,25 @@ def guess_from_mall(data, business, day):
 
 def confidence_shop_follows(data, business, mall_id):
     """How sure we are that the shop uses its centre's hours, from the days both entered special hours."""
+    same, different = days_shop_followed(data, business, mall_id)
+    if same == 0 and different == 0:
+        return MALL_CONFIDENCE
+    if same >= different:
+        return FOLLOWS_CENTRE_CONFIDENCE
+    return KEEPS_OWN_HOURS_CONFIDENCE
+
+
+def mall_evidence(data, business):
+    """On how many past special days the shop used its centre's hours, and on how many it didn't: for the decider."""
+    mall_id = business.get("c_shoppingCenterEntityId")
+    if not mall_id:
+        return {"in_mall": 0.0, "mall_same_days": -1.0, "mall_different_days": -1.0}
+    same, different = days_shop_followed(data, business, mall_id)
+    return {"in_mall": 1.0, "mall_same_days": float(same), "mall_different_days": float(different)}
+
+
+def days_shop_followed(data, business, mall_id):
+    """(days the shop entered the same special hours as its centre, days it entered different ones)."""
     shop_hours_by_date = {}
     for entry in data["holiday_history_by_business"][business["meta"]["id"]]:
         if entry["date"] < data["snapshot"]:
@@ -53,9 +72,4 @@ def confidence_shop_follows(data, business, mall_id):
             same += 1
         else:
             different += 1
-
-    if same == 0 and different == 0:
-        return MALL_CONFIDENCE
-    if same >= different:
-        return FOLLOWS_CENTRE_CONFIDENCE
-    return KEEPS_OWN_HOURS_CONFIDENCE
+    return same, different

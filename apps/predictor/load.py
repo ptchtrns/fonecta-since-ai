@@ -42,6 +42,7 @@ def load_everything(snapshot, include_live_answers=False):
         "true_closures_by_month": load_true_closures_by_month(businesses, snapshot),
         "google_user_edits": load_google_user_edits(snapshot),
         "holiday_on": load_holiday_calendar(),
+        "day_types": load_day_types(),
         "snow_depth": load_snow_depth(snapshot),
         "snow_chance": load_snow_chance(),
         "reviews": load_reviews(snapshot),
@@ -188,6 +189,11 @@ def load_holiday_calendar():
     for row in database().execute("SELECT country, date, day_key FROM calendar_special_day"):
         holiday_on[(row["country"], row["date"])] = row["day_key"]
     return holiday_on
+
+
+def load_day_types():
+    """What kind of day each holiday is, e.g. "XMAS_EVE" -> "EVE" (PUBLIC_HOLIDAY, EVE, OBSERVANCE, COMMERCIAL, ...)."""
+    return {row["day_key"]: row["day_type"] for row in database().execute("SELECT DISTINCT day_key, day_type FROM calendar_special_day")}
 
 
 def load_snow_depth(snapshot):
