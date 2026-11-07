@@ -1,10 +1,16 @@
 """Clue: do what the owner entered for this holiday the last time it came round."""
 
+from datetime import date
+
 from hours import hours_to_text, is_one_interval, normal_hours
 
 # Each year further back counts this much less when measuring how consistent the owner is.
 # Below 1, so a recent change of habit outweighs many old years.
 YEAR_WEIGHT_DECAY = 0.7
+
+# Confidence is multiplied by this for every year the owner skipped since their newest entry: an owner
+# who stopped entering a holiday may have changed their habit.
+SKIPPED_YEAR_DECAY = 0.7
 
 # Stands for an entry where the owner said "normal hours" for the day.
 NORMAL_HOURS = "normal"
@@ -21,9 +27,13 @@ def guess_from_last_year(data, business, holiday, day):
     else:
         hours = adjust_to_this_weekday(data, business, newest, newest_day, day)
 
+    years_since_newest = (date.fromisoformat(day) - date.fromisoformat(newest_day)).days / 365
+    skipped_years = max(0, round(years_since_newest) - 1)
+    confidence = consistency([answer for _, answer in answers]) * SKIPPED_YEAR_DECAY ** skipped_years
+
     return {
         "hours": hours,
-        "confidence": consistency([answer for _, answer in answers]),
+        "confidence": confidence,
         "reason": "Based on what you entered for this day in previous years",
     }
 

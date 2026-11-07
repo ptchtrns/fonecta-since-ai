@@ -79,14 +79,20 @@ def cache_key(question, instructions, model=MODEL):
 
 
 def read_json_answer(text):
-    """Cloud models sometimes wrap the JSON in ```json fences or a sentence, so take what's between the braces."""
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1:
-        return {}
-    try:
-        return json.loads(text[start:end + 1])
-    except json.JSONDecodeError:
-        return {}
+    """The last JSON object in the model's reply, or {} if there is none.
+
+    Replies sometimes come wrapped in ```json fences or a sentence, and Qwen2.5-72B on Featherless
+    sometimes starts with a burst of "!!!!" before the real answer. So try each "{" from the end
+    until one starts an object that reads as JSON.
+    """
+    end = text.rfind("}")
+    start = text.rfind("{", 0, end)
+    while start != -1:
+        try:
+            return json.loads(text[start:end + 1])
+        except json.JSONDecodeError:
+            start = text.rfind("{", 0, start)
+    return {}
 
 
 def send(question, instructions, model):

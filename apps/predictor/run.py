@@ -12,10 +12,13 @@ from pathlib import Path
 
 from clues import (
     flag_if_closed_for_good,
+    guess_from_google_edits,
     guess_from_last_year,
     guess_from_mall,
     guess_from_peers,
     guess_from_reviews,
+    guess_from_seasonal_break,
+    guess_from_snow,
     guess_from_type_habits,
 )
 from combine import combine
@@ -58,7 +61,9 @@ def main():
         for question in questions:
             answer = decide(data, season, question)
             if answer:
-                writer.writerow([question["entity_id"], question["date"], answer["action"], answer.get("hours", ""), answer.get("confidence", "")])
+                hours = answer.get("hours", "")
+                confidence = answer.get("confidence", "")
+                writer.writerow([question["entity_id"], question["date"], answer["action"], hours, confidence])
 
     print(f"Wrote {season['output'].name}")
     subprocess.run([
@@ -81,9 +86,12 @@ def decide(data, season, question):
     guess = combine([
         guess_from_mall(data, business, day),
         guess_from_last_year(data, business, holiday, day),
-        guess_from_reviews(data, business, holiday),
+        guess_from_reviews(data, business, holiday, day),
         guess_from_peers(data, business, holiday),
         guess_from_type_habits(data, business, holiday),
+        guess_from_google_edits(data, business, holiday),
+        guess_from_snow(data, business, day),
+        guess_from_seasonal_break(data, business, day),
     ])
     if guess is None:
         return None

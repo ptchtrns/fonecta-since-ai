@@ -39,6 +39,21 @@ def normal_hours(data, business, day, as_of=None):
     return hours_to_text(published["hours"].get(weekday_of(day)))
 
 
+def published_breaks(versions):
+    """[(start, end)] of the breaks in a business's published weekly hours: versions with every day closed.
+
+    end is the day the next version took over, or "9999" if the break is still going on.
+    """
+    breaks = []
+    for number, version in enumerate(versions):
+        every_day_closed = all(hours_to_text(version["hours"].get(weekday)) == "closed" for weekday in WEEKDAYS)
+        if every_day_closed and version["effective_from"] != "before-2024":
+            is_last = number == len(versions) - 1
+            end = "9999" if is_last else versions[number + 1]["effective_from"]
+            breaks.append((version["effective_from"], end))
+    return breaks
+
+
 def shown_on_google_now(business, day):
     """What Google shows for this day, read from entities.json: the listings as they are on 6 Nov 2026."""
     hours = business["hours"]

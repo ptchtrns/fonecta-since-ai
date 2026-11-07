@@ -37,5 +37,5 @@ def guess_from_type_habits(data, business, holiday):
     return {
         "hours": "closed",
         "confidence": closed_rate,
-        "reason": f"{closed_rate:.0%} of similar businesses are closed on this day",
+        "reason": f"{closed_rate:.0%} of businesses like yours were closed on this day in earlier years",
     }
