@@ -1,12 +1,14 @@
 """Answers every question of a season, writes the predictions file and scores it.
 
-    python3 apps/predictor/run.py                 # 2026 season -> predictions_2026.csv
-    python3 apps/predictor/run.py --season 2025   # back-test, as if today were 6 Nov 2025
-    python3 apps/predictor/run.py --save local    # also put the 2026 predictions on the dashboard
+    python3 apps/predictor/run.py                     # 2026 season -> predictions_2026.csv
+    python3 apps/predictor/run.py --season 2025       # back-test, as if today were 6 Nov 2025
+    python3 apps/predictor/run.py --save local        # also put the 2026 predictions on the dashboard
+    python3 apps/predictor/run.py --business FI-D0001 # one business's 2026 predictions as JSON, nothing written
 """
 
 import argparse
 import csv
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -14,7 +16,7 @@ from pathlib import Path
 from clues import flag_if_closed_for_good
 from decider import choose, confidence
 from hours import normal_hours, shown_on_google_back_then, shown_on_google_now
-from load import load_everything, load_questions, load_yext_questions
+from load import load_business_questions, load_everything, load_questions, load_yext_questions
 from options import options_for, weak_closed_reason
 from save import save_predictions
 
@@ -49,7 +51,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", choices=SEASONS, default="2026")
     parser.add_argument("--save", choices=["local", "remote"], help="which database the dashboard should show this in")
+    parser.add_argument("--business", help="print one business's 2026 predictions as JSON instead")
     args = parser.parse_args()
+    if args.business:
+        print(json.dumps(predict_business(args.business), ensure_ascii=False, indent=2))
+        return
     if args.save and args.season != "2026":
         parser.error("--save is only for the 2026 season: a back-test isn't something to show owners")
     season = SEASONS[args.season]
@@ -85,6 +91,35 @@ def main():
         "--predictions", season["output"],
         "--labels", season["answers"],
     ])
+
+
+def predict_business(business_id):
+    """Fresh 2026 predictions for one business, for the worker to run after its owner answers a suggestion.
+
+    The data is loaded again on every call, so the owner's latest answers are always included.
+    Returns [{"date", "day_key", "action", "shown", "hours", "confidence", "reasons"}], one per day that
+    needs a suggestion or a flag.
+    """
+    season = SEASONS["2026"]
+    data = load_everything(season["snapshot"], include_live_answers=True)
+    if business_id not in data["businesses"]:
+        raise ValueError(f"No business with the ID {business_id}")
+
+    predictions = []
+    for question in load_business_questions(2026, business_id):
+        answer = decide(data, season, question)
+        if answer is None:
+            continue
+        predictions.append({
+            "date": question["date"],
+            "day_key": question["day_key"],
+            "action": answer["action"],
+            "shown": answer["shown"],
+            "hours": answer.get("hours"),
+            "confidence": answer.get("confidence"),
+            "reasons": answer["reasons"],
+        })
+    return predictions
 
 
 def decide(data, season, question):

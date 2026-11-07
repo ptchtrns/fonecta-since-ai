@@ -70,7 +70,10 @@ The predictor reads the 2025 pilot's answers and the answers given in the web ap
 - Approved or edited hours become the owner's own entry for that holiday, so next year the last-year clue suggests them. In the pilot, edited hours matched what the owner really did 26 times out of 26.
 - Rejected hours are never suggested for that holiday again. In the pilot they were wrong all 28 times we can check. But only 11 of those owners kept what Google showed, so a rejection tells us what's wrong, not what's right.
 - A day the owner has already answered is not asked about again.
+- Hours approved or edited in the web app also count as something the owner has told us, like their own entries. So one answer changes the other days too: when the owner of Kahvila Kipinä (FI-D0017), who has no history, approves "closed" for Christmas Day, the predictor becomes surer they also close on Epiphany (0.51 to 0.65). Owners with years of history move much less.
 - The pilot's answers are also training examples for the decider. In the product, every approve, edit and decline could be one.
+
+Right after an owner answers, the web app asks the worker to predict that business again (`run.py --business`, about 3 seconds), and the dashboard shows the new suggestions. See "One business at a time" in [TECHNICAL.md](TECHNICAL.md).
 
 ## Scoring and rules
 
@@ -82,19 +85,19 @@ Right hours earn 1 point and hours within 30 minutes 0.6. Getting open or closed
 
 ## Scores so far
 
-| Change | 2026 | 2025 back-test |
-|---|---|---|
-| Do nothing | 0 | - |
-| Last year's hours | 57.85 | - |
-| Plus peers ("closed" when at least 20% of similar businesses close) | 64.14 | 59.95 |
-| Last year: confidence from all past years, weekday adjustment | 64.17 | 60.34 |
-| Plus the shopping centre's hours | 64.58 | 61.40 |
-| Clues combined by confidence instead of a fixed order | 64.55 | 61.20 |
-| Plus type habits (no own history, at least 80% of the type closed) | 65.00 | 61.80 |
-| Plus the closed-for-good flag | 65.22 | 61.80 |
-| Plus Google edits, snow, seasonal breaks and reviews | 66.27 | 63.35 |
-| Plus owners' answers | 66.69 | 63.36 |
-| A learned decider instead of "highest confidence wins" | 67.58 | 65.02 |
+| Change                                                              | 2026  | 2025 back-test |
+| ------------------------------------------------------------------- | ----- | -------------- |
+| Do nothing                                                          | 0     | -              |
+| Last year's hours                                                   | 57.85 | -              |
+| Plus peers ("closed" when at least 20% of similar businesses close) | 64.14 | 59.95          |
+| Last year: confidence from all past years, weekday adjustment       | 64.17 | 60.34          |
+| Plus the shopping centre's hours                                    | 64.58 | 61.40          |
+| Clues combined by confidence instead of a fixed order               | 64.55 | 61.20          |
+| Plus type habits (no own history, at least 80% of the type closed)  | 65.00 | 61.80          |
+| Plus the closed-for-good flag                                       | 65.22 | 61.80          |
+| Plus Google edits, snow, seasonal breaks and reviews                | 66.27 | 63.35          |
+| Plus owners' answers                                                | 66.69 | 63.36          |
+| A learned decider instead of "highest confidence wins"              | 67.58 | 65.02          |
 
 The decider's scores come from `train.py --check`, where each training business is decided by a model that never saw it, as the hidden test businesses will be. `run.py` prints higher numbers (68.29 and 65.85) because the saved models also learned from these businesses' earlier seasons.
 
@@ -113,6 +116,9 @@ The decider's scores come from `train.py --check`, where each training business 
 - Norway's holiday trading law. The dataset's Norwegian shops do close on public holidays, which the type habits already learn, but many stayed open after 16:00 on Christmas Eve, New Year's Eve and Easter Saturday, which the law wouldn't allow.
 - Our own decision-tree code instead of scikit-learn. About 0.3 to 0.5 points lower, and ten times slower to train.
 - Snow for anything but "no snow, so the ski rental is closed". Snow doesn't say what the hours are, and summer terraces are closed all winter anyway.
+- What businesses within a kilometre entered for the same holiday. Owners without history did close more often where their neighbours had, but the decider gained only 0.03 to 0.05 points: the type and peer rates already say the same.
+- Trends by area, like a whole town closing an hour earlier. When businesses changed their hours, a business matched its city's most common closing time 28% of the time, against 22% for everyone together and 42% for its own type. The type matters, the town hardly at all.
+- Reviews that complain about the hours without naming the holiday, matched to the nearest special day before they were written. Only 20 of 32 "closed" readings matched what really happened that day, against about 9 in 10 for reviews that name the holiday.
 - A small language model on a laptop for reading reviews. It read Finnish "ovet olivat kiinni" (the doors were closed) as open until we gave it a word list.
 
 ## Where the points are lost
@@ -130,11 +136,9 @@ If we knew exactly what every business did on the same holiday last time and rep
 
 - Owners who changed their normal hours and never updated the listing. Customers notice and suggest new weekly hours, but those edits are almost always wrong on listings that are up to date. It needs a second sign, like a review saying the hours have changed.
 - Events and school holidays. Few rows, but two demo stories need them: the bar next to the arena (FI-D0010) and the play centre in school holidays (FI-D0014).
-- Matching reviews that don't name the holiday to the nearest holiday by the date they were written.
 - A language model that writes the owner messages and understands free-text replies like "we close at 3 instead".
 
 ## Next steps
 
-1. Re-run the predictor for one business right after its owner answers, as a worker job, so the next suggestion reflects the answer within seconds.
-2. Add the web app's approvals, edits and declines to the decider's training examples, the way the pilot's answers already are.
-3. Offer standing permission to owners who approved the same holiday twice.
+1. Add the web app's approvals, edits and declines to the decider's training examples, the way the pilot's answers already are.
+2. Offer standing permission to owners who approved the same holiday twice.

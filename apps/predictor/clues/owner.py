@@ -41,6 +41,16 @@ def work_out_owner_evidence(data, business_id):
         else:
             special_hours_days += 1
 
+    # Hours the owner approved or edited in the web app this season tell us as much as their own entries.
+    told = data["owner_answers"]["told"][business_id]
+    for hours in told:
+        entries += 1
+        entries_last_year += 1
+        if hours == "closed":
+            closed_days += 1
+        else:
+            special_hours_days += 1
+
     evidence = {
         "owner_entries": float(entries),
         "owner_entries_last_year": float(entries_last_year),
@@ -57,7 +67,9 @@ def work_out_owner_evidence(data, business_id):
         evidence["owner_special_share"] = special_hours_days / days_with_exceptions
 
     last_entry = data["last_owner_entry"].get(business_id)
-    if last_entry:
+    if told:
+        evidence["owner_days_since_entry"] = 0.0
+    elif last_entry:
         evidence["owner_days_since_entry"] = float((snapshot - date.fromisoformat(last_entry[:10])).days)
     return evidence
 

@@ -13,6 +13,7 @@ export default defineConfig({
       '**/file-routes.d.ts',
       '**/drizzle/**',
       'apps/worker/**',
+      'apps/predictor/models/**',
       'data/**',
     ],
   },

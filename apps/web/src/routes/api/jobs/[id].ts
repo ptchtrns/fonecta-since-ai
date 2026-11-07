@@ -10,6 +10,7 @@ import {
   type ApiEvent,
 } from '~/server/http';
 import { finishJob } from '~/services/jobs.service';
+import { PREDICT_BUSINESS_JOB, savePredictionRefresh } from '~/services/predictions.service';
 
 // Called by apps/worker to report a job result.
 export async function PATCH(event: ApiEvent) {
@@ -32,6 +33,8 @@ export async function PATCH(event: ApiEvent) {
         return unexpected();
     }
   }
+
+  if (job.type === PREDICT_BUSINESS_JOB && job.status === 'done') await savePredictionRefresh(job.result);
 
   return json({ data: job });
 }
