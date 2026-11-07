@@ -24,7 +24,6 @@ Every answer is saved in `ai_cache.json`, which is committed, so a run only asks
 ```sh
 python3 apps/predictor/read_reviews.py 300     # read the next 300 unread reviews
 python3 apps/predictor/read_reviews.py clean   # drop cached answers nothing uses any more
-python3 apps/predictor/try_models.py           # test models on 25 hand-labelled reviews
 ```
 
 Reading all ~1,350 reviews costs about 15 cents. Setting `PROVIDER = "ollama"` in `ai.py` runs a local model instead, but the small ones that fit a laptop read Finnish badly.
@@ -53,7 +52,6 @@ For every question (one business on one day):
 | `holiday_names.py` | Holiday names as customers write them, in fi/sv/nb/en. `find_holiday(text)` was right for 99.9% of reviews, checked against the review dates | Done |
 | `review_reading.py` | Asks the model what a review says (closed, closed early, opened late, open, shut down for good, or nothing useful) and, for closed early or opened late, which times it gives. Finnish businesses' reviews go to Qwen2.5-72B, Swedish and Norwegian ones to Mistral-Small 24B. `PROMPT_NOTES.md` explains how the instructions were written | Done |
 | `read_reviews.py` | Reads the reviews the clues need, in batches, and cleans the cache | Done |
-| `try_models.py` | Tests models on 25 hand-labelled reviews | Done |
 | `clues/last_year.py` | Suggests the newest year's hours. Confidence = how much past years agree, recent years count more (`YEAR_WEIGHT_DECAY`). Adjusts for the holiday falling on a different weekday | Done |
 | `clues/mall.py` | Shop in a shopping centre that published hours for the day: suggest the centre's exact hours (shops did this ~250 times vs 6 times keeping their own opening time) | Done |
 | `clues/reviews.py` | A review from the last 400 days says the doors were closed on this holiday: suggest closed. Closed-early reviews with a closing time aren't used yet | Built, reviews being read |
