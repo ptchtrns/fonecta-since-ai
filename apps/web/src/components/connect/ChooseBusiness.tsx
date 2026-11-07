@@ -4,12 +4,13 @@ import { FormMessage } from '~/components/FormMessage';
 import { apiSend } from '~/lib/api';
 import { createFormState } from '~/lib/form';
 import { getWorkspace } from '~/queries/workspace';
-import { BusinessCombobox } from './BusinessCombobox';
+import { BusinessCombobox, type BusinessOption } from './BusinessCombobox';
 
-/** Picks the account's business: shown to accounts that don't have one, and in Settings to change it. */
-export function ChooseBusiness(props: { title: string }) {
+/** Picks the account's business: shown to accounts that don't have one, and in Account to change it. */
+export function ChooseBusiness(props: { title: string; current?: BusinessOption }) {
   const form = createFormState();
-  const [entityId, setEntityId] = createSignal('');
+  const [entityId, setEntityId] = createSignal(props.current?.id ?? '');
+  const unchanged = () => !!props.current && entityId() === props.current.id;
 
   function onSubmit(event: SubmitEvent) {
     event.preventDefault();
@@ -30,9 +31,9 @@ export function ChooseBusiness(props: { title: string }) {
       <form class="card-body gap-4" onSubmit={onSubmit} novalidate>
         <h2 class="card-title">{props.title}</h2>
         <FormMessage message={form.message()} />
-        <BusinessCombobox onSelect={(option) => setEntityId(option.id)} />
+        <BusinessCombobox initial={props.current} onSelect={(option) => setEntityId(option.id)} />
         <div class="card-actions justify-end">
-          <button type="submit" class="btn btn-primary" disabled={form.pending()}>
+          <button type="submit" class="btn btn-primary" disabled={form.pending() || unchanged()}>
             <Show when={form.pending()}>
               <span class="loading loading-spinner loading-sm" />
             </Show>

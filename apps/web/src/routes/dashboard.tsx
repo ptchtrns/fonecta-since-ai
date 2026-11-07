@@ -12,7 +12,6 @@ import {
   LogoutIcon,
   MenuIcon,
   PlugIcon,
-  ShieldIcon,
   StoreIcon,
   UserIcon,
 } from '~/components/connect/icons';
@@ -41,7 +40,6 @@ const pages: Link[] = [
 ];
 const maintenance: Link[] = [
   { href: '/dashboard/integrations', label: 'Integrations', icon: () => <PlugIcon /> },
-  { href: '/dashboard/sources', label: 'Sources', icon: () => <ShieldIcon /> },
   { href: '/dashboard/account', label: 'Account', icon: () => <UserIcon /> },
 ];
 
@@ -55,10 +53,6 @@ function navCounts(w: Workspace | null): Record<string, number> {
     '/dashboard/visibility': visibility.listings + visibility.seo + visibility.ai,
   };
 }
-
-/** The Connect product the business is on. Businesses from the Yext account are on the team's sandbox. */
-const planName = (w: Workspace) =>
-  w.business.source === 'yext' ? 'Fonecta Connect · Yext sandbox' : w.business.product;
 
 // Layout for every page under /dashboard. Guests are redirected by middleware and by requireUser.
 // The drawer checkbox means "overlay open" on small screens and "expanded" on large ones.
@@ -146,7 +140,16 @@ export default function DashboardLayout(props: ParentProps) {
             </div>
             <Show when={workspace()}>
               {(w) => (
-                <p class="truncate text-xs text-base-content/60 is-drawer-close:hidden">{planName(w())}</p>
+                <a
+                  href="/dashboard/company"
+                  class="mt-2 block rounded-field border border-base-300 px-3 py-2 hover:bg-base-200 is-drawer-close:hidden"
+                  onClick={closeOnMobile}
+                >
+                  <span class="block truncate text-sm font-medium">{w().business.name}</span>
+                  <span class="block truncate text-xs text-base-content/60">
+                    {[w().business.category, w().business.city].filter(Boolean).join(' · ')}
+                  </span>
+                </a>
               )}
             </Show>
           </div>
@@ -162,8 +165,6 @@ export default function DashboardLayout(props: ParentProps) {
               <For each={maintenance}>{(link) => <NavItem link={link} onPick={closeOnMobile} />}</For>
             </ul>
           </nav>
-
-          <Show when={workspace()}>{(w) => <StatusBlock workspace={w()} />}</Show>
 
           <div class="border-t border-base-300 p-2">
             <div class="dropdown dropdown-top w-full is-drawer-close:dropdown-right is-drawer-close:dropdown-end">
@@ -237,35 +238,5 @@ function NavItem(props: { link: Link; count?: number; onPick: () => void }) {
         </Show>
       </a>
     </li>
-  );
-}
-
-/** Whether suggestions reach the owner and whether customers can find the business, at a glance. */
-function StatusBlock(props: { workspace: Workspace }) {
-  const whatsapp = () => props.workspace.whatsapp;
-  const google = () => props.workspace.presence.listings.find((l) => l.publisherId === 'GOOGLEMYBUSINESS');
-  return (
-    <section class="flex flex-col gap-2 px-4 pb-4 text-sm is-drawer-close:hidden" aria-label="Status">
-      <p class="text-xs text-base-content/50">Status</p>
-      <a href="/dashboard/integrations" class="flex items-start gap-2.5 hover:underline">
-        <span
-          class={['status mt-1.5', whatsapp().on ? 'status-success' : 'status-neutral opacity-40']}
-          aria-hidden="true"
-        />
-        <span class="min-w-0">
-          WhatsApp {whatsapp().on ? 'on' : 'off'}
-          <Show when={whatsapp().on && whatsapp().phone}>
-            <span class="block truncate text-xs text-base-content/50">{whatsapp().phone}</span>
-          </Show>
-        </span>
-      </a>
-      <a href="/dashboard/visibility" class="flex items-start gap-2.5 hover:underline">
-        <span
-          class={['status mt-1.5', google()?.live ? 'status-success' : 'status-neutral opacity-40']}
-          aria-hidden="true"
-        />
-        <span>{google()?.live ? 'Google live' : 'Not live on Google'}</span>
-      </a>
-    </section>
   );
 }

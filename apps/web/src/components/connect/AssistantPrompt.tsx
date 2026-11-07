@@ -136,16 +136,12 @@ export function AssistantPrompt(props: { workspace: Workspace }) {
 
   return (
     <section
-      class="flex flex-col items-center gap-5 py-4 text-center sm:py-8"
+      class="flex flex-col items-center gap-5 py-2 text-center sm:py-6"
       aria-labelledby="assistant-title"
     >
-      <p class="flex items-center gap-2 text-sm font-medium text-base-content/60">
-        <span class="status status-success" aria-hidden="true" />
-        AI Assistant
-      </p>
-      <h1 id="assistant-title" class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+      <h2 id="assistant-title" class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
         What would you like to improve today?
-      </h1>
+      </h2>
       <form
         class="flex w-full max-w-2xl items-end gap-2 rounded-box border border-base-300 bg-base-100 p-2 pl-4 text-left focus-within:border-base-content/40"
         onSubmit={onSubmit}

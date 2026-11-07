@@ -155,7 +155,6 @@ async function readBusiness(entityId: string) {
       ),
     } as EntityHours,
     timezone: e.timezone,
-    product: e.connectProduct,
     owner: row.contactFirstName ?? e.name,
     shoppingCentreId: e.shoppingCentreId,
     segment: e.segment,

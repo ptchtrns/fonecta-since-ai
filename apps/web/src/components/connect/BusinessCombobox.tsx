@@ -16,10 +16,15 @@ const SEARCH_DELAY_MS = 150;
  * Finds a business by name, city or street as the owner types, and submits its id in a hidden `entityId` field.
  * Follows the ARIA combobox pattern: focus stays in the input, arrow keys move through the list, Enter picks.
  */
-export function BusinessCombobox(props: { error?: string; onSelect?: (option: BusinessOption) => void }) {
-  const [text, setText] = createSignal('');
+export function BusinessCombobox(props: {
+  error?: string;
+  // Shown as picked to begin with, such as the account's business when changing it.
+  initial?: BusinessOption;
+  onSelect?: (option: BusinessOption) => void;
+}) {
+  const [text, setText] = createSignal(props.initial ? `${props.initial.name}, ${props.initial.city}` : '');
   const [options, setOptions] = createSignal<BusinessOption[]>([]);
-  const [selected, setSelected] = createSignal<BusinessOption | null>(null);
+  const [selected, setSelected] = createSignal<BusinessOption | null>(props.initial ?? null);
   const [open, setOpen] = createSignal(false);
   const [active, setActive] = createSignal(0);
   const [loading, setLoading] = createSignal(false);

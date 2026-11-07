@@ -624,7 +624,8 @@ export const suggestionState = sqliteTable(
 export const sourceKinds = ['website', 'facebook', 'instagram', 'other'] as const;
 export type SourceKind = (typeof sourceKinds)[number];
 
-// Pages the owner linked. Each suggestion is compared with the hours found on them.
+// Pages the owner linked, any number of them. Each suggestion is compared with the hours found on them. `kind` is
+// worked out from the address and only names the page in a warning.
 export const businessSource = sqliteTable(
   'business_source',
   {
@@ -637,7 +638,7 @@ export const businessSource = sqliteTable(
     checkedAt: integer('checked_at', { mode: 'timestamp_ms' }).notNull(),
     ...timestamps,
   },
-  (t) => [primaryKey({ columns: [t.entityId, t.kind] })],
+  (t) => [primaryKey({ columns: [t.entityId, t.url] })],
 );
 
 export type User = typeof user.$inferSelect;

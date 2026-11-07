@@ -9,7 +9,6 @@ import { BrandMark } from '~/components/connect/PublisherLogo';
 
 const nav = [
   { label: 'Front page', icon: HomeIcon, count: '3', active: true },
-  { label: 'Sources', icon: ShieldIcon },
   { label: 'Integrations', icon: PlugIcon },
 ];
 
@@ -196,14 +195,6 @@ function HomeIcon() {
   return (
     <Icon>
       <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1Z" />
-    </Icon>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <Icon>
-      <path d="M12 22s8-3 8-10V5l-8-3-8 3v7c0 7 8 10 8 10Z" />
     </Icon>
   );
 }

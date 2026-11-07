@@ -5,12 +5,16 @@ import { FormField } from '~/components/FormField';
 import { FormMessage } from '~/components/FormMessage';
 import { apiSend } from '~/lib/api';
 import { createFormState } from '~/lib/form';
+import { timeAgo } from '~/lib/format';
 import { formatDay, formatHours, groupWeek, WEEKDAYS, WEEKDAY_SHORT, type Weekday } from '~/lib/hours';
 import { getWorkspace, type Workspace } from '~/queries/workspace';
-import { businessEditSchema } from '~/schemas/business.schema';
+import { businessEditSchema, MAX_LINKS } from '~/schemas/business.schema';
 import { HoursInput } from './HoursInput';
+import { XIcon } from './icons';
 
 const EXCEPTIONS_SHOWN = 4;
+
+const shortUrl = (url: string) => url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
@@ -29,9 +33,20 @@ export function BusinessCard(props: { business: Workspace['business'] }) {
   const [saved, setSaved] = createSignal('');
   // The form is only mounted while the dialog is open, so a cancelled edit doesn't come back the next time.
   const [editing, setEditing] = createSignal(false);
+  // One row per link in the form. Ids keep each input in place while rows above it are removed.
+  const [links, setLinks] = createSignal<{ id: number; url: string }[]>([]);
+  let nextLink = 0;
   let dialog!: HTMLDialogElement;
+  let linkList!: HTMLUListElement;
+
+  function addLink() {
+    setLinks([...links(), { id: nextLink++, url: '' }]);
+    flush();
+    linkList.querySelector<HTMLInputElement>('li:last-child input')?.focus();
+  }
 
   function openEditor() {
+    setLinks(b().links.map((l) => ({ id: nextLink++, url: l.url })));
     setHours(b().hours);
     setSaved('');
     form.setMessage(null);
@@ -42,9 +57,14 @@ export function BusinessCard(props: { business: Workspace['business'] }) {
 
   function onSubmit(event: SubmitEvent) {
     event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
     const input = {
-      ...Object.fromEntries(new FormData(event.currentTarget as HTMLFormElement)),
+      ...Object.fromEntries(data),
       hours: hours(),
+      links: data
+        .getAll('links')
+        .map((v) => String(v).trim())
+        .filter(Boolean),
     };
     const payload = form.validate(businessEditSchema, input);
     if (!payload) return;
@@ -113,6 +133,40 @@ export function BusinessCard(props: { business: Workspace['business'] }) {
                 )}
               </For>
             </div>
+          </Row>
+          <Row label="Pages with your hours">
+            <Show
+              when={b().links.length}
+              fallback={
+                <span class="text-base-content/60">
+                  None yet. Link your website or Facebook page and every suggestion is checked against it.
+                </span>
+              }
+            >
+              <ul class="flex flex-col gap-1.5">
+                <For each={b().links}>
+                  {(link) => (
+                    <li class="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="link link-hover min-w-0 truncate"
+                      >
+                        {shortUrl(link.url)}
+                      </a>
+                      <span
+                        class={['text-xs', link.status === 'read' ? 'text-base-content/50' : 'text-warning']}
+                      >
+                        {link.status === 'read'
+                          ? `${link.days ? `Hours for ${link.days} ${link.days === 1 ? 'day' : 'days'}` : 'No dated hours'} · read ${timeAgo(link.checkedAt)}`
+                          : 'Couldn’t read this page'}
+                      </span>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
           </Row>
           <Show when={b().exceptions.length}>
             <Row label="Coming exceptions">
@@ -184,6 +238,49 @@ export function BusinessCard(props: { business: Workspace['business'] }) {
                 </For>
                 <Show when={form.fieldErrors().hours}>
                   <span class="text-error">{form.fieldErrors().hours}</span>
+                </Show>
+              </fieldset>
+              <fieldset class="flex flex-col gap-2">
+                <legend class="font-medium">Pages with your hours</legend>
+                <p class="text-sm text-base-content/60">
+                  Your website, Facebook page, booking page or shopping centre page. We read them every night,
+                  and a suggestion they disagree with waits for you instead of going out.
+                </p>
+                <ul ref={linkList} class="flex flex-col gap-2">
+                  <For each={links()} keyed={(l) => l.id}>
+                    {(link, i) => (
+                      <li class="flex gap-2">
+                        <input
+                          name="links"
+                          type="url"
+                          class={['input w-full', { 'input-error': !!form.fieldErrors().links }]}
+                          aria-label={`Link ${i() + 1}`}
+                          placeholder="https://yourbusiness.fi/opening-hours"
+                          defaultValue={link().url}
+                        />
+                        <button
+                          type="button"
+                          class="btn btn-square btn-ghost"
+                          aria-label={`Remove link ${i() + 1}`}
+                          onClick={() => setLinks(links().filter((l) => l.id !== link().id))}
+                        >
+                          <XIcon class="size-4" />
+                        </button>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+                <Show when={form.fieldErrors().links}>
+                  <span class="text-error">{form.fieldErrors().links}</span>
+                </Show>
+                <Show when={links().length < MAX_LINKS}>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-ghost self-start border-base-300"
+                    onClick={addLink}
+                  >
+                    Add a link
+                  </button>
                 </Show>
               </fieldset>
               <div class="modal-action">

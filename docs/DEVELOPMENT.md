@@ -135,11 +135,11 @@ An account belongs to one business, chosen with the combobox when signing up (`u
 
 | Page | What it shows |
 | ---- | ------------- |
-| Front page | The assistant's question box, the four headline numbers, the next suggestion (all of them on request), WhatsApp, profile, listings, reviews and suggested edits |
-| Company information | The business card and its edit form, the profile checklist and holidays without hours |
+| Front page | The business's name, the assistant's question box, the four headline numbers, the next suggestion (all of them on request), connections, profile, listings, reviews and suggested edits |
+| Company information | The business card and its edit form, including the pages with the business's hours, the profile checklist and holidays without hours |
 | Visibility | Tabs for Listings (sites, update speeds, accounts to link), SEO (local search score) and AI (what assistants can answer) |
 | Reports | Profile strength, what happened to the suggestions, what Connecta AI found, how the owner answers, reviews |
-| Integrations, Sources, Account | Under Maintenance: WhatsApp, linked pages, and sign-in details and the account's business |
+| Integrations, Account | Under Maintenance: WhatsApp, and sign-in details and the account's business |
 
 The sidebar counts what needs the owner on each page: waiting suggestions, missing profile items, and sites not live plus missing SEO and AI items.
 
@@ -151,7 +151,7 @@ Dataset tables stay as they were loaded, so clicks in the demo can't change what
 | ------------------ | -------------------------------------------------------------------------- |
 | `business_profile` | The owner's edits on top of `entity`, WhatsApp settings, standing permission |
 | `suggestion_state` | One row per suggestion sent or answered: token for the link, decision, what was suggested |
-| `business_source` | Pages the owner linked and the hours found on them |
+| `business_source` | Pages the owner linked, any number of them, and the hours found on them |
 
 Optional settings, all in `.dev.vars.example`:
 

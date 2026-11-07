@@ -5,8 +5,8 @@ import { AssistantPrompt } from '~/components/connect/AssistantPrompt';
 import { CompactChecklist } from '~/components/connect/Checklist';
 import { ArrowRightIcon } from '~/components/connect/icons';
 import { Card, eyebrow, Meter, StatCard } from '~/components/connect/Metrics';
-import { Page, Panel } from '~/components/connect/Page';
-import { LogoStrip } from '~/components/connect/PublisherLogo';
+import { Page, PageHeader, Panel } from '~/components/connect/Page';
+import { BrandMark, LogoStrip } from '~/components/connect/PublisherLogo';
 import { SuggestionCard } from '~/components/connect/SuggestionCard';
 import { formatDay, formatHours } from '~/lib/hours';
 import { suggestionStats } from '~/lib/report';
@@ -46,6 +46,20 @@ export default function FrontPage() {
   return (
     <Page>
       <Title>{`${workspace().business.name} · Connecta AI`}</Title>
+      <PageHeader
+        title={workspace().business.name}
+        subtitle={[
+          workspace().business.category,
+          `${workspace().business.addressLine1}, ${workspace().business.city}`,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+        actions={
+          <a href="/dashboard/company" class="btn btn-sm btn-ghost border-base-300">
+            Company information
+          </a>
+        }
+      />
       <AssistantPrompt workspace={workspace()} />
 
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -167,7 +181,7 @@ export default function FrontPage() {
         </div>
 
         <aside class="flex flex-col gap-4" aria-label="Your profile at a glance">
-          <WhatsAppCard whatsapp={workspace().whatsapp} />
+          <ConnectionsCard whatsapp={workspace().whatsapp} />
 
           <Card
             label="Profile"
@@ -205,34 +219,54 @@ export default function FrontPage() {
   );
 }
 
-function WhatsAppCard(props: { whatsapp: Workspace['whatsapp'] }) {
+/** Where suggestions reach the owner besides this page. WhatsApp is the only connection so far. */
+function ConnectionsCard(props: { whatsapp: Workspace['whatsapp'] }) {
+  const connections = () => [
+    {
+      name: 'WhatsApp',
+      on: props.whatsapp.on && !!props.whatsapp.phone,
+      detail: props.whatsapp.phone,
+      off: 'Not set up',
+    },
+  ];
   return (
     <Card
-      label="WhatsApp"
+      label="Connections"
       aside={
-        <span class={['font-medium', props.whatsapp.on ? 'text-success' : 'text-base-content/50']}>
-          {props.whatsapp.on ? 'On' : 'Off'}
-        </span>
+        <a
+          href="/dashboard/integrations"
+          class="flex items-center gap-1 font-medium text-base-content hover:underline"
+        >
+          Manage <ArrowRightIcon />
+        </a>
       }
     >
-      <Show
-        when={props.whatsapp.on && props.whatsapp.phone}
-        fallback={
-          <p class="text-sm text-base-content/70">
-            Answer suggestions with one tap, without logging in.{' '}
-            <a href="/dashboard/integrations" class="link">
-              Turn it on
-            </a>
-          </p>
-        }
-      >
-        <p class="flex items-start gap-2 text-sm">
-          <span class="status status-success mt-1.5" aria-hidden="true" />
-          <span>
-            New suggestions go to <strong class="whitespace-nowrap">{props.whatsapp.phone}</strong>
-          </span>
-        </p>
-      </Show>
+      <ul class="flex flex-col gap-3">
+        <For each={connections()}>
+          {(c) => (
+            <li class="flex items-center gap-3 text-sm">
+              <BrandMark name={c.name} class="size-7" />
+              <span class="min-w-0 flex-1">
+                <span class="block font-medium">{c.name}</span>
+                <span class="block truncate text-xs text-base-content/60">{c.on ? c.detail : c.off}</span>
+              </span>
+              <Show
+                when={c.on}
+                fallback={
+                  <a href="/dashboard/integrations" class="btn btn-xs btn-ghost border-base-300">
+                    Set up
+                  </a>
+                }
+              >
+                <span class="flex items-center gap-1.5 text-xs font-medium">
+                  <span class="status status-success" aria-hidden="true" />
+                  On
+                </span>
+              </Show>
+            </li>
+          )}
+        </For>
+      </ul>
     </Card>
   );
 }
