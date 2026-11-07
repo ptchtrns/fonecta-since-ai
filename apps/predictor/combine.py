@@ -1,33 +1,33 @@
-"""Combines the guesses from all clues into one decision."""
+"""Turns the guesses from all clues into one."""
+
+from collections import defaultdict
 
 
 def combine(guesses):
-    """Pick the hours the clues are most confident about, or None if no clue had anything to say.
+    """The hours the clues are most sure about, or None if no clue had a guess.
 
-    Clues that suggest the same hours back each other up: their confidences are combined as
-    independent chances of being right, 1 - (1 - c1) * (1 - c2) * ..., so two clues at 0.7
-    give 0.91. The combined guess keeps the reasons of every clue that agreed.
+    Clues that suggest the same hours back each other up: two clues at 0.7 give
+    1 - 0.3 * 0.3 = 0.91, as if they were independent chances of being right.
     """
-    by_hours = {}
+    guesses_by_hours = defaultdict(list)
     for guess in guesses:
-        if guess is None:
-            continue
-        if guess["hours"] not in by_hours:
-            by_hours[guess["hours"]] = []
-        by_hours[guess["hours"]].append(guess)
+        if guess is not None:
+            guesses_by_hours[guess["hours"]].append(guess)
 
     best = None
-    for hours, agreeing in by_hours.items():
-        chance_all_wrong = 1
-        for guess in agreeing:
-            chance_all_wrong *= 1 - guess["confidence"]
-
-        candidate = {
-            "hours": hours,
-            "confidence": 1 - chance_all_wrong,
-            "reasons": [guess["reason"] for guess in agreeing],
-        }
-        if best is None or candidate["confidence"] > best["confidence"]:
-            best = candidate
-
+    for hours, agreeing in guesses_by_hours.items():
+        confidence = combined_confidence(agreeing)
+        if best is None or confidence > best["confidence"]:
+            best = {
+                "hours": hours,
+                "confidence": confidence,
+                "reasons": [guess["reason"] for guess in agreeing],
+            }
     return best
+
+
+def combined_confidence(agreeing_guesses):
+    chance_all_wrong = 1
+    for guess in agreeing_guesses:
+        chance_all_wrong *= 1 - guess["confidence"]
+    return 1 - chance_all_wrong

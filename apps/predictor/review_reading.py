@@ -1,8 +1,8 @@
-"""Reads customer reviews: is a review about opening hours, and what did the customer find?"""
+"""Reading customer reviews: is a review about opening hours, and what did the customer find?"""
 
 import ai
 
-# Words that show a review is about opening hours or a closed door, in Finnish, Swedish, Norwegian and English.
+# A review mentioning any of these is about opening hours or a closed door.
 HOURS_WORDS = [
     "kiinni", "suljet", "aukiolo", "auki",
     "stängt", "stängd", "öppettid", "öppet",
@@ -12,8 +12,8 @@ HOURS_WORDS = [
 
 ANSWERS = ["closed", "closed_early", "open", "permanently_closed", "unknown"]
 
-# Instructions for the language model. The word table helps a small model with Finnish,
-# which it otherwise often reads the wrong way round ("kiinni" as open).
+# The word table is there for Finnish: without it the small local model read "ovet olivat kiinni"
+# (the doors were closed) as open. Changing this text invalidates the cached answers in ai_cache.json.
 INSTRUCTIONS = """You read one customer review of a business. Decide what the customer found when they came.
 
 Useful words:
@@ -33,7 +33,6 @@ Answer only with JSON: {"found": "closed" | "closed_early" | "open" | "permanent
 
 
 def is_about_hours(review_text):
-    """Return True if the review mentions opening hours or a closed door."""
     text = review_text.lower()
     for word in HOURS_WORDS:
         if word in text:
@@ -42,8 +41,8 @@ def is_about_hours(review_text):
 
 
 def what_customer_found(review_text):
-    """Ask the language model what the customer found: one of ANSWERS."""
-    answer = ai.ask_for_json(f'Review: "{review_text}"', INSTRUCTIONS).get("found")
+    """One of ANSWERS, decided by the language model."""
+    answer = ai.ask(f'Review: "{review_text}"', INSTRUCTIONS).get("found")
     if answer not in ANSWERS:
         return "unknown"
     return answer

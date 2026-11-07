@@ -1,33 +1,31 @@
-"""Clue: how often businesses of the same type really close on this holiday, learned from the training data."""
+"""Clue: for owners who never told us about a holiday, how often their type of business closes on it.
 
-# Suggest "closed" only when at least this share of same-type businesses were really closed.
-# 0.8 scored best on both seasons; below 0.7 the wrong "closed" guesses cost more than the right ones earn.
+The rates come from the true hours of the dev businesses (labels/dev_truth_history.csv), which the
+challenge gives as training data.
+"""
+
+# 0.8 scored best on both seasons. At 0.5-0.7 the wrong "closed" guesses cost more than the right ones earned.
 MIN_CLOSED_RATE = 0.8
 
-# Ignore groups with fewer days than this: a handful of businesses says little about a whole type.
+# A group needs at least this many days before its rate means anything.
 MIN_DAYS = 10
 
 
 def guess_from_type_habits(data, business, holiday):
-    """Suggest "closed" when most businesses of the same type and country were closed on this holiday.
+    business_id = business["meta"]["id"]
 
-    Only for businesses that have never entered anything for this holiday: if the owner has told us
-    what they do, their own history decides instead. The business's own past days are also left out
-    of the rate, so its own answers never decide its guess.
-    """
-    if has_own_history(data, business, holiday):
+    # The owner's own entries decide instead, when there are any.
+    if data["holiday_history"][(business_id, holiday)]:
         return None
 
-    key =(business["meta"]["countryCode"], business["c_segment"], holiday)
-    counts_per_business = data["true_closures"].get(key, {})
-
+    group = (business["meta"]["countryCode"], business["c_segment"], holiday)
     days = 0
     closed_days = 0
-    for business_id, (business_days, business_closed_days) in counts_per_business.items():
-        if business_id == business["meta"]["id"]:
-            continue
-        days += business_days
-        closed_days += business_closed_days
+    for other_id, (other_days, other_closed_days) in data["true_closures"].get(group, {}).items():
+        # Leave the business itself out, so a dev business never learns from its own answers.
+        if other_id != business_id:
+            days += other_days
+            closed_days += other_closed_days
 
     if days < MIN_DAYS:
         return None
@@ -41,11 +39,3 @@ def guess_from_type_habits(data, business, holiday):
         "confidence": closed_rate,
         "reason": f"{closed_rate:.0%} of similar businesses are closed on this day",
     }
-
-
-def has_own_history(data, business, holiday):
-    """Return True if the owner entered anything for this holiday before the snapshot date."""
-    for entry in data["holiday_history"][(business["meta"]["id"], holiday)]:
-        if entry["entered_at"] < data["snapshot"]:
-            return True
-    return False

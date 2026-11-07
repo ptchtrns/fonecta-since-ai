@@ -1,125 +1,62 @@
-"""Reads the challenge data files and groups the rows so they can be looked up by business."""
+"""Loads the challenge data, keeping only what Connect knew on the snapshot date.
+
+Everything entered, published or written on or after the snapshot is dropped here, so no clue
+can accidentally look into the future.
+"""
 
 import csv
 import json
 from collections import defaultdict
+from datetime import date
 from pathlib import Path
 
 DATA = Path(__file__).parents[2] / "data" / "fonecta-connect-suggests-2026" / "data"
 LABELS = DATA.parent / "labels"
 
 
+def load_everything(snapshot):
+    """Load all the data the clues use. snapshot is the date the run pretends is today."""
+    businesses = load_businesses()
+    holiday_history = load_holiday_history(snapshot)
+    return {
+        "snapshot": snapshot,
+        "businesses": businesses,
+        "holiday_history": holiday_history,
+        "holiday_history_by_date": group_by_date(holiday_history),
+        "regular_hours_history": load_regular_hours_history(snapshot),
+        "peers": load_peers(),
+        "city_sizes": load_city_sizes(),
+        "true_closures": load_true_closures(businesses, snapshot),
+        "google_user_edits": load_google_user_edits(snapshot),
+        "reviews": load_reviews(snapshot),
+    }
+
+
 def load_businesses():
-    """Load every business and shopping centre.
-
-    Returns {business_id: business}, where business is the entity from entities.json.
-    """
-    with open(DATA / "entities.json", encoding="utf-8") as file:
-        businesses = json.load(file)["response"]["entities"]
-
-    by_id = {}
-    for business in businesses:
-        by_id[business["meta"]["id"]] = business
-    return by_id
+    """Every business and shopping centre from entities.json, by business ID."""
+    businesses = {}
+    for business in read_json("entities.json")["response"]["entities"]:
+        businesses[business["meta"]["id"]] = business
+    return businesses
 
 
-def load_holiday_history():
-    """Load every special-day entry owners have made since 2024.
+def load_holiday_history(snapshot):
+    """Special-day hours owners entered, by (business ID, holiday), in the order they were entered.
 
-    Returns {(business_id, holiday): [entries]}. Entries are in the order they were entered,
-    so when an owner changed their mind about a date, the later entry comes last.
+    When an owner changed their mind about a date, the later entry comes last.
     """
     history = defaultdict(list)
-
-    with open(DATA / "holiday_hours_history.jsonl", encoding="utf-8") as file:
-        for line in file:
-            entry = json.loads(line)
-            key = (entry["entity_id"], entry["day_key"])
-            history[key].append(entry)
+    for entry in read_jsonl("holiday_hours_history.jsonl"):
+        if entry["entered_at"] < snapshot:
+            history[(entry["entity_id"], entry["day_key"])].append(entry)
 
     for entries in history.values():
         entries.sort(key=lambda entry: entry["entered_at"])
     return history
 
 
-def load_regular_hours_history():
-    """Load every published version of each business's normal weekly hours.
-
-    Returns {business_id: [versions]}, oldest first. The first version is always "before-2024".
-    """
-    history = defaultdict(list)
-
-    with open(DATA / "regular_hours_history.jsonl", encoding="utf-8") as file:
-        for line in file:
-            version = json.loads(line)
-            history[version["entity_id"]].append(version)
-    return history
-
-
-def load_peers():
-    """Load what similar businesses entered on each holiday.
-
-    Returns {(country, city_size, business_type, holiday): stats}. All stats are strings.
-    """
-    peers = {}
-
-    with open(DATA / "peer_benchmarks.csv", encoding="utf-8") as file:
-        for row in csv.DictReader(file):
-            key = (row["country"], row["city_tier"], row["segment"], row["day_key"])
-            peers[key] = row
-    return peers
-
-
-def load_city_sizes():
-    """Load the size class of each city, e.g. {"Helsinki": "capital"}."""
-    city_sizes = {}
-
-    with open(DATA / "cities.csv", encoding="utf-8") as file:
-        for row in csv.DictReader(file):
-            city_sizes[row["city"]] = row["city_tier"]
-    return city_sizes
-
-
-def load_holiday_dates():
-    """Load the date of each holiday in every year, e.g. {("FI", "XMAS_EVE"): ["2024-12-24", ...]}."""
-    dates = defaultdict(list)
-
-    with open(DATA / "calendar_special_days.csv", encoding="utf-8") as file:
-        for row in csv.DictReader(file):
-            dates[(row["country"], row["day_key"])].append(row["date"])
-    return dates
-
-
-def load_google_user_edits():
-    """Load the edits Google, Apple and Bing users have suggested.
-
-    Returns {business_id: [edits]}. Roughly half of them are wrong.
-    """
-    with open(DATA / "publisher_suggestions.json", encoding="utf-8") as file:
-        edits = json.load(file)["response"]["suggestions"]
-
-    by_business = defaultdict(list)
-    for edit in edits:
-        by_business[edit["locationId"]].append(edit)
-    return by_business
-
-
-def load_reviews():
-    """Load customer reviews, returned as {business_id: [reviews]}."""
-    with open(DATA / "reviews.json", encoding="utf-8") as file:
-        reviews = json.load(file)["response"]["reviews"]
-
-    by_business = defaultdict(list)
-    for review in reviews:
-        by_business[review["locationId"]].append(review)
-    return by_business
-
-
 def group_by_date(holiday_history):
-    """Regroup the holiday history by exact date instead of by holiday.
-
-    Returns {(business_id, date): [entries]}, in the order they were entered.
-    """
+    """The same entries, by (business ID, date) instead of by holiday."""
     by_date = defaultdict(list)
     for entries in holiday_history.values():
         for entry in entries:
@@ -127,46 +64,90 @@ def group_by_date(holiday_history):
     return by_date
 
 
-def load_true_closures(businesses, snapshot):
-    """Count how often the dev businesses were really closed on each holiday before the snapshot date.
+def load_regular_hours_history(snapshot):
+    """Each business's published weekly hours, by business ID, oldest version first.
 
-    This is training data: the true hours of the dev businesses, given with the challenge.
-    Returns {(country, business_type, holiday): {business_id: [days, closed_days]}}.
+    The first version is always "before-2024".
+    """
+    history = defaultdict(list)
+    for version in read_jsonl("regular_hours_history.jsonl"):
+        if version["effective_from"] == "before-2024" or version["effective_from"] < snapshot:
+            history[version["entity_id"]].append(version)
+    return history
+
+
+def load_peers():
+    """What similar businesses entered on each holiday, by (country, city size, business type, holiday).
+
+    All values are strings, as in the CSV.
+    """
+    peers = {}
+    for row in read_csv(DATA / "peer_benchmarks.csv"):
+        peers[(row["country"], row["city_tier"], row["segment"], row["day_key"])] = row
+    return peers
+
+
+def load_city_sizes():
+    """City name to size class, e.g. "Helsinki" -> "capital"."""
+    city_sizes = {}
+    for row in read_csv(DATA / "cities.csv"):
+        city_sizes[row["city"]] = row["city_tier"]
+    return city_sizes
+
+
+def load_true_closures(businesses, snapshot):
+    """How often each dev business was really closed on each holiday, from the training data.
+
+    Returns {(country, business type, holiday): {business ID: [days, closed days]}}.
     """
     closures = defaultdict(dict)
+    for row in read_csv(LABELS / "dev_truth_history.csv"):
+        if row["date"] >= snapshot:
+            continue
 
-    with open(LABELS / "dev_truth_history.csv", encoding="utf-8") as file:
-        for row in csv.DictReader(file):
-            if row["date"] >= snapshot:
-                continue
-
-            business = businesses[row["entity_id"]]
-            key = (business["meta"]["countryCode"], business["c_segment"], row["day_key"])
-            counts = closures[key].setdefault(row["entity_id"], [0, 0])
-            counts[0] += 1
-            if row["truth_hours"] == "closed":
-                counts[1] += 1
-
+        business = businesses[row["entity_id"]]
+        group = (business["meta"]["countryCode"], business["c_segment"], row["day_key"])
+        counts = closures[group].setdefault(row["entity_id"], [0, 0])
+        counts[0] += 1
+        if row["truth_hours"] == "closed":
+            counts[1] += 1
     return closures
 
 
-def load_everything(snapshot):
-    """Load every data file once into one dict, e.g. data["businesses"]["FI-D0001"].
+def load_google_user_edits(snapshot):
+    """Edits Google, Apple and Bing users suggested before the snapshot, by business ID.
 
-    snapshot is the date the run pretends is today. Nothing entered after it may be used.
+    About half of them are wrong. Their status may have been decided after the snapshot.
     """
-    businesses = load_businesses()
-    holiday_history = load_holiday_history()
-    return {
-        "snapshot": snapshot,
-        "businesses": businesses,
-        "true_closures": load_true_closures(businesses, snapshot),
-        "holiday_history": holiday_history,
-        "holiday_history_by_date": group_by_date(holiday_history),
-        "regular_hours_history": load_regular_hours_history(),
-        "peers": load_peers(),
-        "city_sizes": load_city_sizes(),
-        "holiday_dates": load_holiday_dates(),
-        "google_user_edits": load_google_user_edits(),
-        "reviews": load_reviews(),
-    }
+    edits = defaultdict(list)
+    for edit in read_json("publisher_suggestions.json")["response"]["suggestions"]:
+        if edit["dateCreated"] < snapshot:
+            edits[edit["locationId"]].append(edit)
+    return edits
+
+
+def load_reviews(snapshot):
+    """Reviews written before the snapshot, by business ID. Each gets a "written_on" date."""
+    snapshot_date = date.fromisoformat(snapshot)
+
+    reviews = defaultdict(list)
+    for review in read_json("reviews.json")["response"]["reviews"]:
+        review["written_on"] = date.fromtimestamp(review["publisherDate"] / 1000)
+        if review["written_on"] < snapshot_date:
+            reviews[review["locationId"]].append(review)
+    return reviews
+
+
+def read_json(name):
+    with open(DATA / name, encoding="utf-8") as file:
+        return json.load(file)
+
+
+def read_jsonl(name):
+    with open(DATA / name, encoding="utf-8") as file:
+        return [json.loads(line) for line in file]
+
+
+def read_csv(path):
+    with open(path, encoding="utf-8") as file:
+        return list(csv.DictReader(file))

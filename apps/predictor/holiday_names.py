@@ -107,10 +107,10 @@ HOLIDAY_NAMES = [
 
 
 def find_holiday(review_text):
-    """Return the day key of the holiday a review talks about, e.g. "BOXING_DAY", or None."""
-    text = review_text.lower()
-    text = text.replace("’", "'")   # "New Year’s Eve" is written with either apostrophe
-    text = " " + text                # so " 1. mai" also matches at the very start, but not inside "11. mai"
+    """The day key of the holiday a review talks about, like "BOXING_DAY", or None."""
+    # Both apostrophes appear in "New Year's Eve". The leading space lets " 1. mai" match at the
+    # very start of a review without matching inside "11. mai".
+    text = " " + review_text.lower().replace("’", "'")
 
     for name, day_key in HOLIDAY_NAMES:
         if name in text:

@@ -1,70 +1,60 @@
-"""Clue: repeat what the owner entered for the same holiday in earlier years."""
+"""Clue: do what the owner entered for this holiday the last time it came round."""
 
-from hours import hours_to_text, normal_hours
+from hours import hours_to_text, is_one_interval, normal_hours
 
-# How much each earlier year counts compared with the year after it, when measuring confidence.
-# Below 1 so that a recent change of habit outweighs many old years.
+# Each year further back counts this much less when measuring how consistent the owner is.
+# Below 1, so a recent change of habit outweighs many old years.
 YEAR_WEIGHT_DECAY = 0.7
+
+# Stands for an entry where the owner said "normal hours" for the day.
+NORMAL_HOURS = "normal"
 
 
 def guess_from_last_year(data, business, holiday, day):
-    """Suggest the hours the owner entered for this holiday most recently.
-
-    Returns None if the owner has never entered anything for this holiday.
-    """
-    answers = answers_per_year(data, business, holiday)
+    answers = past_answers(data, business, holiday)
     if not answers:
         return None
 
-    newest_date, newest = answers[-1]
-    if newest == "regular":
+    newest_day, newest = answers[-1]
+    if newest == NORMAL_HOURS:
         hours = normal_hours(data, business, day)
     else:
-        hours = adjust_to_this_weekday(data, business, newest, newest_date, day)
+        hours = adjust_to_this_weekday(data, business, newest, newest_day, day)
 
     return {
         "hours": hours,
-        "confidence": how_much_years_agree([answer for _, answer in answers], newest),
+        "confidence": consistency([answer for _, answer in answers]),
         "reason": "Based on what you entered for this day in previous years",
     }
 
 
-def answers_per_year(data, business, holiday):
-    """List what the owner entered for this holiday in each earlier year.
+def past_answers(data, business, holiday):
+    """What the owner entered for this holiday in past years, as [(day, hours)], oldest first.
 
-    Returns [(date, answer)], oldest first. The answer is hours text like "10:00-17:00",
-    "closed", or "regular" when the owner said normal hours. Entries made after the snapshot
-    are ignored.
+    hours is text like "10:00-17:00" or "closed", or NORMAL_HOURS.
     """
-    business_id = business["meta"]["id"]
-    snapshot = data["snapshot"]
+    answer_per_day = {}
+    for entry in data["holiday_history"][(business["meta"]["id"], holiday)]:
+        if entry["date"] >= data["snapshot"]:
+            continue  # entered early for the coming season, not a past year
 
-    answer_per_date = {}
-    for entry in data["holiday_history"][(business_id, holiday)]:
-        if entry["date"] < snapshot and entry["entered_at"] < snapshot:
-            if entry["holidayHours"].get("isRegularHours"):
-                answer_per_date[entry["date"]] = "regular"
-            else:
-                answer_per_date[entry["date"]] = hours_to_text(entry["holidayHours"])
+        if entry["holidayHours"].get("isRegularHours"):
+            answer_per_day[entry["date"]] = NORMAL_HOURS
+        else:
+            answer_per_day[entry["date"]] = hours_to_text(entry["holidayHours"])
 
-    return [(past_date, answer_per_date[past_date]) for past_date in sorted(answer_per_date)]
+    return sorted(answer_per_day.items())
 
 
-def adjust_to_this_weekday(data, business, past_hours, past_date, day):
-    """Move last year's hours onto this year's weekday.
+def adjust_to_this_weekday(data, business, past_hours, past_day, day):
+    """Where the past hours just followed that weekday's normal opening or closing time, use this year's.
 
-    Where last year's opening or closing time was simply that weekday's normal time, use this
-    weekday's normal time instead.
-
-    Example: normal hours are Sunday 12-18 and Thursday 10-20. Last NYE was a Sunday and the
-    owner entered 12-17. This NYE is a Thursday, so the guess is 10-17, not 12-17.
+    Normal hours Sunday 12-18 and Thursday 10-20: last NYE was a Sunday and the owner entered 12-17.
+    This NYE is a Thursday, so the guess is 10-17 ("normal opening, close at 17"), not 12-17.
     """
-    normal_then = normal_hours(data, business, past_date, as_of=past_date)
+    normal_then = normal_hours(data, business, past_day, as_of=past_day)
     normal_now = normal_hours(data, business, day)
-
-    only_one_interval = "," not in past_hours + normal_then + normal_now
-    all_open = "closed" not in (past_hours, normal_then, normal_now)
-    if not (only_one_interval and all_open):
+    if not (is_one_interval(past_hours) and is_one_interval(normal_then) and is_one_interval(normal_now)):
         return past_hours
 
     opens, closes = past_hours.split("-")
@@ -79,11 +69,9 @@ def adjust_to_this_weekday(data, business, past_hours, past_date, day):
     return f"{opens}-{closes}"
 
 
-def how_much_years_agree(answers, newest):
-    """Return how many of the years agree with the newest answer, from 0 to 1.
-
-    Recent years count more (see YEAR_WEIGHT_DECAY).
-    """
+def consistency(answers):
+    """How much the past years agree with the newest one, from 0 to 1. Recent years count more."""
+    newest = answers[-1]
     total = 0
     agreeing = 0
     weight = 1

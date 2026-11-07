@@ -1,11 +1,13 @@
-"""Answers every target question, writes the predictions file and scores it.
+"""Answers every question of a season, writes the predictions file and scores it.
 
-Usage: python3 apps/predictor/run.py [--season 2026|2025]
+    python3 apps/predictor/run.py                 # 2026 season -> predictions_2026.csv
+    python3 apps/predictor/run.py --season 2025   # back-test, as if today were 6 Nov 2025
 """
 
 import argparse
 import csv
 import subprocess
+import sys
 from pathlib import Path
 
 from clues import (
@@ -41,45 +43,54 @@ SEASONS = {
 
 
 def main():
-    """Predict an action for each question in the season and run the official scorer on the result."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", choices=SEASONS, default="2026")
     season = SEASONS[parser.parse_args().season]
 
     data = load_everything(season["snapshot"])
+    with open(season["questions"], encoding="utf-8") as file:
+        questions = list(csv.DictReader(file))
 
-    with open(season["questions"], encoding="utf-8") as questions_file:
-        questions = list(csv.DictReader(questions_file))
-
-    with open(season["output"], "w", newline="", encoding="utf-8") as output_file:
-        writer = csv.writer(output_file)
+    with open(season["output"], "w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
         writer.writerow(["entity_id", "date", "action", "hours", "confidence"])
-
         for question in questions:
-            business = data["businesses"][question["entity_id"]]
-            if season["is_back_test"]:
-                shown = shown_on_google_back_then(data, business, question["date"])
-            else:
-                shown = shown_on_google_now(business, question["date"])
+            suggestion = suggest(data, season, question)
+            if suggestion:
+                writer.writerow([question["entity_id"], question["date"], "SUGGEST", suggestion["hours"], suggestion["confidence"]])
 
-            guess = combine([
-                guess_from_mall(data, business, question["date"]),
-                guess_from_last_year(data, business, question["day_key"], question["date"]),
-                guess_from_reviews(data, business, question["day_key"]),
-                guess_from_peers(data, business, question["day_key"]),
-                guess_from_type_habits(data, business, question["day_key"]),
-            ])
-
-            if guess and guess["hours"] != shown:
-                writer.writerow([question["entity_id"], question["date"], "SUGGEST", guess["hours"], guess["confidence"]])
-
-    print(f"Wrote {len(questions)} rows to {season['output'].name}")
-
+    print(f"Wrote {season['output'].name}")
     subprocess.run([
-        "python3", DATASET / "evaluation" / "evaluate.py",
+        sys.executable, DATASET / "evaluation" / "evaluate.py",
         "--predictions", season["output"],
         "--labels", season["answers"],
     ])
+
+
+def suggest(data, season, question):
+    """The hours to suggest for one business on one day, or None to stay quiet."""
+    business = data["businesses"][question["entity_id"]]
+    holiday = question["day_key"]
+    day = question["date"]
+
+    guess = combine([
+        guess_from_mall(data, business, day),
+        guess_from_last_year(data, business, holiday, day),
+        guess_from_reviews(data, business, holiday),
+        guess_from_peers(data, business, holiday),
+        guess_from_type_habits(data, business, holiday),
+    ])
+    if guess is None:
+        return None
+
+    if season["is_back_test"]:
+        shown = shown_on_google_back_then(data, business, day)
+    else:
+        shown = shown_on_google_now(business, day)
+
+    if guess["hours"] == shown:
+        return None  # Google already shows it
+    return guess
 
 
 if __name__ == "__main__":
