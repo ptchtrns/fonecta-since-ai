@@ -1,20 +1,8 @@
 import 'server-only';
-import { and, eq, gte, sql, type SQL } from 'drizzle-orm';
-import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
-import {
-  businessSource,
-  calendarSpecialDay,
-  city,
-  entity,
-  holidayHoursHistory,
-  peerBenchmark,
-  publisherSuggestion,
-  review,
-  type SourceKind,
-} from '~/db/schema';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
+import { businessSource, calendarSpecialDay, type SourceKind } from '~/db/schema';
 import { err, ok } from '~/lib/result';
 import { isPublicUrl, readHours } from '~/lib/source-reader';
-import type { LinkSourcePayload } from '~/schemas/business.schema';
 import { db } from '~/server/db';
 import { log } from '~/server/log';
 import type { Business } from '~/services/business.service';
@@ -60,84 +48,69 @@ async function readPage(url: string, country: Business['country']) {
   }
 }
 
-/** Links a page, or checks a linked one again. */
-export async function linkSource(business: Business, input: LinkSourcePayload) {
-  const url = withScheme(input.url);
-  if (!isPublicUrl(url)) return err({ reason: 'InvalidUrl' as const });
-  const page = await readPage(url, business.country);
-  const row = { url, status: page.status, findings: page.findings, checkedAt: new Date() };
-  await db
-    .insert(businessSource)
-    .values({ entityId: business.id, kind: input.kind, ...row })
-    .onConflictDoUpdate({ target: [businessSource.entityId, businessSource.kind], set: row });
-  return ok(page);
+const hostOf = (url: string) => new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+
+/** What kind of page an address is, so a warning can say "Your Facebook page says…". */
+function kindOf(url: string, website: string): SourceKind {
+  const host = hostOf(url);
+  if (host === 'facebook.com' || host.endsWith('.facebook.com') || host === 'fb.com') return 'facebook';
+  if (host === 'instagram.com' || host.endsWith('.instagram.com')) return 'instagram';
+  if (website && isPublicUrl(withScheme(website)) && host === hostOf(withScheme(website))) return 'website';
+  return 'other';
 }
 
-export async function unlinkSource(entityId: string, kind: SourceKind) {
+/** The owner's list of addresses, with a scheme and without repeats, or the first one that isn't a public page. */
+export function normalizeLinks(links: string[]) {
+  const urls = [...new Set(links.filter(Boolean).map(withScheme))];
+  const invalid = urls.find((url) => !isPublicUrl(url));
+  return invalid ? err({ reason: 'InvalidUrl' as const, url: invalid }) : ok(urls);
+}
+
+/** Reads a page and keeps what it says, for a new link or one read again. */
+async function readSource(business: Business, url: string) {
+  const page = await readPage(url, business.country);
+  const row = {
+    kind: kindOf(url, business.website),
+    url,
+    status: page.status,
+    findings: page.findings,
+    checkedAt: new Date(),
+  };
   await db
-    .delete(businessSource)
-    .where(and(eq(businessSource.entityId, entityId), eq(businessSource.kind, kind)));
-  return ok({ kind });
+    .insert(businessSource)
+    .values({ entityId: business.id, ...row })
+    .onConflictDoUpdate({ target: [businessSource.entityId, businessSource.url], set: row });
+  return page;
 }
 
 export const listLinkedSources = (entityId: string) =>
   db.select().from(businessSource).where(eq(businessSource.entityId, entityId));
 
-async function count(table: SQLiteTable, where: SQL) {
-  const [row] = await db
-    .select({ n: sql<number>`count(*)` })
-    .from(table)
-    .where(where);
-  return row?.n ?? 0;
-}
-
-/** What every suggestion is already based on, with how much of it this business has. */
-export async function builtInSources(business: Business) {
-  const [history, reviews, googleEdits, centre, peers] = await Promise.all([
-    count(holidayHoursHistory, eq(holidayHoursHistory.entityId, business.id)),
-    count(review, eq(review.entityId, business.id)),
-    count(publisherSuggestion, eq(publisherSuggestion.entityId, business.id)),
-    business.shoppingCentreId
-      ? db.select({ name: entity.name }).from(entity).where(eq(entity.id, business.shoppingCentreId))
-      : Promise.resolve([]),
-    db
-      .select({ n: sql<number>`count(*)` })
-      .from(peerBenchmark)
-      .innerJoin(city, eq(city.cityTier, peerBenchmark.cityTier))
-      .where(
-        and(
-          eq(city.name, business.city),
-          eq(peerBenchmark.country, business.country),
-          eq(peerBenchmark.segment, business.segment),
-        ),
-      ),
-  ]);
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  return [
-    {
-      name: 'Your past holiday hours',
-      detail: plural(history, 'day entered', 'days entered'),
-      active: history > 0,
-    },
-    ...(centre[0] ? [{ name: 'Shopping centre hours', detail: centre[0].name, active: true }] : []),
-    {
-      name: 'Similar businesses nearby',
-      detail: peers[0]?.n ? 'Anonymised, same type and town size' : 'None to compare with',
-      active: !!peers[0]?.n,
-    },
-    { name: 'Customer reviews', detail: plural(reviews, 'review read', 'reviews read'), active: reviews > 0 },
-    {
-      name: 'Google user edits',
-      detail: plural(googleEdits, 'suggested edit', 'suggested edits'),
-      active: googleEdits > 0,
-    },
-  ];
+/**
+ * Makes the linked pages exactly `urls` (from `normalizeLinks`): removes the others and reads the new ones. Pages
+ * already linked keep what was read from them; the nightly run reads them again.
+ */
+export async function setLinkedSources(business: Business, urls: string[]) {
+  const linked = await listLinkedSources(business.id);
+  const removed = linked.filter((s) => !urls.includes(s.url)).map((s) => s.url);
+  const added = urls.filter((url) => !linked.some((s) => s.url === url));
+  if (removed.length) {
+    await db
+      .delete(businessSource)
+      .where(and(eq(businessSource.entityId, business.id), inArray(businessSource.url, removed)));
+  }
+  const pages = await Promise.all(added.map((url) => readSource(business, url)));
+  return {
+    added: added.length,
+    removed: removed.length,
+    unreadable: pages.filter((p) => p.status === 'unreachable').length,
+  };
 }
 
 /** Reads every linked page again, so new dates on them get compared. Part of the nightly run. */
 export async function recheckSources(business: Business) {
   const sources = await listLinkedSources(business.id);
   for (const source of sources) {
-    await linkSource(business, { kind: source.kind, url: source.url });
+    await readSource(business, source.url);
   }
 }

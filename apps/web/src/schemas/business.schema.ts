@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { importances, languages, sourceKinds } from '~/db/schema';
+import { importances, languages } from '~/db/schema';
 import { HOURS_TEXT, WEEKDAYS, type Weekday } from '~/lib/hours';
 
 const entityId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, { message: 'Choose your business from the list' });
+export const MAX_LINKS = 10;
+
 const hours = z.string().regex(HOURS_TEXT, { message: 'Use HH:MM for opening and closing times' });
 
 export const businessSearchSchema = z.object({ q: z.string().trim().max(80).default('') });
@@ -20,6 +22,11 @@ export const businessEditSchema = z.object({
   postalCode: z.string().trim().min(3, { message: 'Enter the postal code' }).max(12),
   description: z.string().trim().max(600),
   hours: z.object(Object.fromEntries(WEEKDAYS.map((d) => [d, hours])) as Record<Weekday, typeof hours>),
+  // Pages with the business's hours, compared with every suggestion. Empty rows are dropped when saving.
+  links: z
+    .array(z.string().trim().max(500))
+    .max(MAX_LINKS, { message: `Up to ${MAX_LINKS} links` })
+    .default([]),
 });
 export type BusinessEditPayload = z.infer<typeof businessEditSchema>;
 
@@ -34,13 +41,6 @@ export const suggestionKeySchema = z.object({
   id: z.string().regex(/^(\d{4}-\d{2}-\d{2}|closed-for-good)$/),
 });
 export const tokenSchema = z.object({ token: z.string().min(16).max(64) });
-
-export const sourceKindSchema = z.object({ kind: z.enum(sourceKinds) });
-export const linkSourceSchema = z.object({
-  kind: z.enum(sourceKinds),
-  url: z.string().trim().min(4, { message: 'Paste the address of the page' }).max(500),
-});
-export type LinkSourcePayload = z.infer<typeof linkSourceSchema>;
 
 export const whatsappSchema = z
   .object({

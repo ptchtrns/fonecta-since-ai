@@ -157,31 +157,85 @@ const PUBLISHERS: Record<string, Site> = {
   WHERETO: { name: 'WhereTo', seconds: UNKNOWN_SPEED_SECONDS },
 };
 
-type RawListing = {
+/** A business's listing on one site. `additionalStatus` is NOT_CONNECTED when the owner's own account there isn't linked. */
+export type YextListing = {
   publisherId: string;
   publisherName?: string;
   status: string;
+  additionalStatus?: string;
+  listingUrl?: string;
   typicalUpdateSpeedSeconds?: number;
 };
 
 const titleCase = (id: string) => id.charAt(0) + id.slice(1).toLowerCase();
 
-/** Sites the listing is live on according to Yext, fastest first, or null when Yext can't say. */
-export async function liveListings(source: BusinessSource, id: string): Promise<Site[] | null> {
-  const result = await call<{ listings: RawListing[] }>(source, 'GET', 'listings/listings', {
+/** The site a listing is on, with how long a change takes to show there. */
+export function siteOf(listing: YextListing): Site {
+  const known = PUBLISHERS[listing.publisherId];
+  return {
+    name: listing.publisherName ?? known?.name ?? titleCase(listing.publisherId),
+    seconds: listing.typicalUpdateSpeedSeconds ?? known?.seconds ?? UNKNOWN_SPEED_SECONDS,
+  };
+}
+
+/** Every listing of the business, live or not, or null when Yext can't say. */
+export async function listings(source: BusinessSource, id: string): Promise<YextListing[] | null> {
+  const result = await call<{ listings: YextListing[] }>(source, 'GET', 'listings/listings', {
     params: { locationIds: id },
   });
-  if (!result?.ok) return null;
-  return result.data.listings
+  return result?.ok ? result.data.listings : null;
+}
+
+/** Sites the listing is live on according to Yext, fastest first, or null when Yext can't say. */
+export async function liveListings(source: BusinessSource, id: string): Promise<Site[] | null> {
+  const all = await listings(source, id);
+  if (!all) return null;
+  return all
     .filter((l) => l.status === 'LIVE')
-    .map((l) => {
-      const known = PUBLISHERS[l.publisherId];
-      return {
-        name: l.publisherName ?? known?.name ?? titleCase(l.publisherId),
-        seconds: l.typicalUpdateSpeedSeconds ?? known?.seconds ?? UNKNOWN_SPEED_SECONDS,
-      };
-    })
+    .map(siteOf)
     .sort((a, b) => a.seconds - b.seconds);
+}
+
+export type YextReview = {
+  id: number;
+  publisherId: string;
+  rating: number;
+  content?: string;
+  authorName?: string;
+  publisherDate: number;
+};
+
+/** The business's reviews from every site Yext collects them from, or null when Yext can't say. */
+export async function reviews(source: BusinessSource, id: string) {
+  const result = await call<{ reviews: YextReview[]; averageRating: number; count: number }>(
+    source,
+    'GET',
+    'reviews',
+    { params: { entityIds: id, limit: '50' } },
+  );
+  return result?.ok ? result.data : null;
+}
+
+/** A change someone suggested on a site, such as a Google user's edit to the hours. */
+export type YextPublisherSuggestion = {
+  id: string;
+  publisherId: string;
+  dateCreated: string;
+  fieldName: string;
+  status: string;
+  originalContent: unknown;
+  suggestedContent: unknown;
+};
+
+/** Suggested edits waiting for the owner's answer, or null when Yext can't say. */
+export async function waitingPublisherSuggestions(source: BusinessSource, id: string) {
+  const result = await call<{ suggestions: YextPublisherSuggestion[] }>(
+    source,
+    'GET',
+    'listings/publishersuggestions',
+    { params: { locationIds: id, statuses: 'WAITING_ON_CUSTOMER' } },
+  );
+  return result?.ok ? result.data.suggestions : null;
 }
 
 export type YextResult = { sent: boolean; error?: string };

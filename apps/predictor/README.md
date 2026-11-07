@@ -23,7 +23,8 @@ python3 apps/predictor/run.py --save remote   # the same for the deployed site, 
 
 A run takes about 20 seconds and needs only the Python standard library. It stops with an error if the database holds only the limited set (`pnpm db:seed:limited`), which has no training data.
 
-`--save` replaces the `prediction` table, which the dashboard's Home page shows. Run `pnpm db:migrate:remote` in `apps/web` before the first `--save remote`. Reseeding empties the table, so save again afterwards.
+`--save` replaces the `prediction` table, which the dashboard's front page shows. Run `pnpm db:migrate:remote` in `apps/web` before the first `--save remote`. Reseeding empties the table, so save again afterwards.
+
 
 After changing a clue, train the decider again. This needs scikit-learn, which `uv run` installs, and takes about two minutes. `--check` adds three more and shows how well it does on businesses it has never seen:
 

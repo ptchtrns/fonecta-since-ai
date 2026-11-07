@@ -127,11 +127,23 @@ The only answers loaded are in `dev_truth_history`, which the predictor uses as 
 
 ## Predictions on the dashboard
 
-`python3 apps/predictor/run.py --save local` replaces the `prediction` table through Wrangler, and the Home page shows the rows for the signed-in account's business. For the deployed site, use `--save remote` after a full local load: the predictor always computes locally and sends only the demo businesses' rows, because the deployed database doesn't have the others.
+`python3 apps/predictor/run.py --save local` replaces the `prediction` table through Wrangler, and the front page shows the rows for the signed-in account's business. For the deployed site, use `--save remote` after a full local load: the predictor always computes locally and sends only the demo businesses' rows, because the deployed database doesn't have the others.
 
 ## The owner's side
 
-An account belongs to one business, chosen with the combobox when signing up (`user.entity_id`). The dashboard has three pages: Home (business card and suggestions), Sources and Integrations. Account settings are in the menu at the bottom of the sidebar.
+An account belongs to one business, chosen with the combobox when signing up (`user.entity_id`). The dashboard's pages:
+
+| Page | What it shows |
+| ---- | ------------- |
+| Front page | The business's name, the assistant's question box, the four headline numbers, the next suggestion (all of them on request), connections, profile, listings, reviews and suggested edits |
+| Company information | The business card and its edit form, including the pages with the business's hours, the profile checklist and holidays without hours |
+| Visibility | Tabs for Listings (sites, update speeds, accounts to link), SEO (local search score) and AI (what assistants can answer) |
+| Reports | Profile strength, what happened to the suggestions, what Connecta AI found, how the owner answers, reviews |
+| Integrations, Account | Under Maintenance: WhatsApp, and sign-in details and the account's business |
+
+The sidebar counts what needs the owner on each page: waiting suggestions, missing profile items, and sites not live plus missing SEO and AI items.
+
+The scores are in `src/lib/visibility.ts`, worked out from data the app already has: the business's details, its listings, reviews and suggested edits (`src/services/presence.service.ts`). For the dataset's businesses these come from the dataset's tables; for the Yext account's, from Yext's Listings, Reviews and Publisher Suggestions APIs. The assistant's box answers its four offered questions from the same data; it has no language model behind it yet.
 
 Dataset tables stay as they were loaded, so clicks in the demo can't change what the predictor scores. What owners do is kept in app tables that survive a reseed or a predictor run:
 
@@ -139,7 +151,7 @@ Dataset tables stay as they were loaded, so clicks in the demo can't change what
 | ------------------ | -------------------------------------------------------------------------- |
 | `business_profile` | The owner's edits on top of `entity`, WhatsApp settings, standing permission |
 | `suggestion_state` | One row per suggestion sent or answered: token for the link, decision, what was suggested |
-| `business_source` | Pages the owner linked and the hours found on them |
+| `business_source` | Pages the owner linked, any number of them, and the hours found on them |
 
 Optional settings, all in `.dev.vars.example`:
 

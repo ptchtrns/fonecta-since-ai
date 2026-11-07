@@ -36,6 +36,7 @@ export default defineConfig({
           'filesystem-routing/api',
           'better-auth',
           'better-auth/adapters/drizzle',
+          'better-auth/api',
           'better-auth/client',
           'drizzle-orm',
           'drizzle-orm/d1',
