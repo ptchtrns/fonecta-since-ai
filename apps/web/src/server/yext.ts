@@ -57,6 +57,9 @@ export type YextEntity = {
   websiteUrl?: { url?: string };
   description?: string;
   timezone?: string;
+  /** Category ids per taxonomy, e.g. Fonecta's own: `{ fonecta: ['R21005287'] }`. */
+  categories?: Record<string, string[]>;
+  categoryIds?: string[];
   // A new entity has no hours at all until someone enters them.
   hours?: EntityHours;
   closed?: boolean;
@@ -66,7 +69,7 @@ type Response<T> = { ok: true; data: T } | { ok: false; status: number; error: s
 
 async function call<T>(
   source: BusinessSource,
-  method: 'GET' | 'PUT',
+  method: 'GET' | 'PUT' | 'POST',
   path: string,
   { params = {}, body }: { params?: Record<string, string>; body?: unknown } = {},
 ): Promise<Response<T> | null> {
@@ -136,25 +139,25 @@ export async function accountEntities(): Promise<YextEntity[]> {
   return entities;
 }
 
-export type Site = { name: string; seconds: number };
+/** A site and how long a change takes to show there, or null when no figure is known. */
+export type Site = { name: string; seconds: number | null };
 
-// The sandbox returns publisher ids only. Names and update speeds match the dataset's listings where it has the
-// publisher. For the rest the speed is a guess of three days.
-const UNKNOWN_SPEED_SECONDS = 259_200;
-const PUBLISHERS: Record<string, Site> = {
-  GOOGLEMYBUSINESS: { name: 'Google (Search & Maps)', seconds: 120 },
-  FACEBOOK: { name: 'Facebook', seconds: 600 },
-  BING: { name: 'Bing', seconds: 86_400 },
-  APPLE: { name: 'Apple Maps', seconds: 172_800 },
-  TRIPADVISOR: { name: 'Tripadvisor', seconds: 259_200 },
-  FOURSQUARE: { name: 'Foursquare', seconds: 604_800 },
-  HERE: { name: 'HERE', seconds: UNKNOWN_SPEED_SECONDS },
-  TOMTOM: { name: 'TomTom', seconds: UNKNOWN_SPEED_SECONDS },
-  MAPQUEST: { name: 'MapQuest', seconds: UNKNOWN_SPEED_SECONDS },
-  NAVMII: { name: 'Navmii', seconds: UNKNOWN_SPEED_SECONDS },
-  SHOWMELOCAL: { name: 'ShowMeLocal', seconds: UNKNOWN_SPEED_SECONDS },
-  TUPALO: { name: 'Tupalo', seconds: UNKNOWN_SPEED_SECONDS },
-  WHERETO: { name: 'WhereTo', seconds: UNKNOWN_SPEED_SECONDS },
+// The sandbox returns publisher ids only, and no update speeds. These are the sites' display names; speeds come from
+// the dataset's listings (`services/sites.service.ts`) for the sites it has.
+const PUBLISHER_NAMES: Record<string, string> = {
+  GOOGLEMYBUSINESS: 'Google (Search & Maps)',
+  FACEBOOK: 'Facebook',
+  BING: 'Bing',
+  APPLE: 'Apple Maps',
+  TRIPADVISOR: 'Tripadvisor',
+  FOURSQUARE: 'Foursquare',
+  HERE: 'HERE',
+  TOMTOM: 'TomTom',
+  MAPQUEST: 'MapQuest',
+  NAVMII: 'Navmii',
+  SHOWMELOCAL: 'ShowMeLocal',
+  TUPALO: 'Tupalo',
+  WHERETO: 'WhereTo',
 };
 
 /** A business's listing on one site. `additionalStatus` is NOT_CONNECTED when the owner's own account there isn't linked. */
@@ -169,14 +172,9 @@ export type YextListing = {
 
 const titleCase = (id: string) => id.charAt(0) + id.slice(1).toLowerCase();
 
-/** The site a listing is on, with how long a change takes to show there. */
-export function siteOf(listing: YextListing): Site {
-  const known = PUBLISHERS[listing.publisherId];
-  return {
-    name: listing.publisherName ?? known?.name ?? titleCase(listing.publisherId),
-    seconds: listing.typicalUpdateSpeedSeconds ?? known?.seconds ?? UNKNOWN_SPEED_SECONDS,
-  };
-}
+/** A site's name from its publisher id. */
+export const publisherName = (listing: Pick<YextListing, 'publisherId' | 'publisherName'>) =>
+  listing.publisherName ?? PUBLISHER_NAMES[listing.publisherId] ?? titleCase(listing.publisherId);
 
 /** Every listing of the business, live or not, or null when Yext can't say. */
 export async function listings(source: BusinessSource, id: string): Promise<YextListing[] | null> {
@@ -184,16 +182,6 @@ export async function listings(source: BusinessSource, id: string): Promise<Yext
     params: { locationIds: id },
   });
   return result?.ok ? result.data.listings : null;
-}
-
-/** Sites the listing is live on according to Yext, fastest first, or null when Yext can't say. */
-export async function liveListings(source: BusinessSource, id: string): Promise<Site[] | null> {
-  const all = await listings(source, id);
-  if (!all) return null;
-  return all
-    .filter((l) => l.status === 'LIVE')
-    .map(siteOf)
-    .sort((a, b) => a.seconds - b.seconds);
 }
 
 export type YextReview = {
@@ -261,5 +249,61 @@ export async function updateEntity(
   const result = await call<unknown>(source, 'PUT', entityPath(id), { body });
   if (!result?.ok) return { sent: false, error: result?.error ?? 'Yext is not connected' };
   if (source === 'yext') cache = null;
+  return { sent: true };
+}
+
+/** One day of Google statistics, with Yext Analytics' metric names. */
+export type YextAnalyticsDay = {
+  date: string;
+  GOOGLE_SEARCH_QUERIES?: number;
+  GOOGLE_SEARCH_VIEWS?: number;
+  GOOGLE_MAP_VIEWS?: number;
+  GOOGLE_CUSTOMER_ACTIONS?: number;
+  GOOGLE_PHONE_CALLS?: number;
+  PROFILE_VIEWS?: number;
+};
+
+/** Daily Google statistics from Yext's Analytics API, or the error Yext gave. Null when it isn't connected. */
+export async function analyticsReport(source: BusinessSource, id: string, from: string, to: string) {
+  const result = await call<{ data: YextAnalyticsDay[] }>(source, 'POST', 'analytics/reports', {
+    body: {
+      metrics: [
+        'GOOGLE_SEARCH_QUERIES',
+        'GOOGLE_SEARCH_VIEWS',
+        'GOOGLE_MAP_VIEWS',
+        'GOOGLE_CUSTOMER_ACTIONS',
+        'GOOGLE_PHONE_CALLS',
+        'PROFILE_VIEWS',
+      ],
+      dimensions: ['DAYS'],
+      filters: { entityIds: [id], startDate: from, endDate: to },
+    },
+  });
+  if (!result) return null;
+  return result.ok
+    ? { ok: true as const, days: result.data?.data ?? [] }
+    : { ok: false as const, error: result.error };
+}
+
+/**
+ * Accepts or rejects a suggested edit in Yext. Accepting applies the change to the entity, and Yext sends it on to
+ * every site. `sent` is false when Yext isn't connected.
+ */
+export async function answerPublisherSuggestion(
+  source: BusinessSource,
+  id: string,
+  status: 'ACCEPTED' | 'REJECTED',
+): Promise<YextResult> {
+  if (!connection(source)) return { sent: false };
+  const result = await call<unknown>(
+    source,
+    'PUT',
+    `listings/publishersuggestions/${encodeURIComponent(id)}`,
+    {
+      params: { status },
+      body: { status },
+    },
+  );
+  if (!result?.ok) return { sent: false, error: result?.error ?? 'Yext is not connected' };
   return { sent: true };
 }

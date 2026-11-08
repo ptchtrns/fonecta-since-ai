@@ -22,7 +22,7 @@ export type OwnerSuggestion = {
   };
   open: boolean;
   views: number | null;
-  sites: { name: string; seconds: number }[] | null;
+  sites: { name: string; seconds: number | null }[] | null;
 };
 
 /** One suggestion, for the no-login link. */

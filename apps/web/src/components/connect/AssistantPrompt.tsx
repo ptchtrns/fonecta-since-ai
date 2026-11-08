@@ -1,14 +1,25 @@
 import { createSignal, For, Show } from 'solid-js';
+import { ApiError, apiSend } from '~/lib/api';
 import { formatDay, formatHours } from '~/lib/hours';
 import type { Check } from '~/lib/visibility';
 import type { Workspace } from '~/queries/workspace';
 import { SendIcon } from './icons';
 import { Card } from './Metrics';
 
-// The front page's question box. Connecta AI has no language model behind it yet, so it answers the questions it
-// offers from the business's own data, and says so when asked anything else.
+// The front page's question box. The questions it offers are answered at once from the business's own data. Anything
+// else goes to the language model (`/api/workspace/ask`), which gets the same data: the listing, the scores and what's
+// missing, the suggestions and the Google statistics. Follow-ups continue the conversation.
 
-type Reply = { question: string; lines: string[]; link?: { href: string; label: string } };
+type Reply = {
+  question: string;
+  lines: string[];
+  link?: { href: string; label: string };
+  /** The model that wrote it, or null for an answer from the data. */
+  model?: string | null;
+  pending?: boolean;
+  error?: boolean;
+};
+type Turn = { role: 'user' | 'assistant'; content: string };
 type Question = { text: string; answer: () => Reply };
 
 // "Live on Google" becomes "live on Google" mid-sentence.
@@ -103,22 +114,64 @@ function questions(w: Workspace): Question[] {
 
 export function AssistantPrompt(props: { workspace: Workspace }) {
   const [text, setText] = createSignal('');
-  const [reply, setReply] = createSignal<Reply | null>(null);
+  const [thread, setThread] = createSignal<Reply[]>([]);
   const list = () => questions(props.workspace);
+  const busy = () => thread().some((r) => r.pending);
+
+  /** The conversation so far, for the model. */
+  const history = (): Turn[] =>
+    thread()
+      .filter((r) => !r.pending && !r.error)
+      .flatMap((r) => [
+        { role: 'user' as const, content: r.question },
+        { role: 'assistant' as const, content: r.lines.join('\n') },
+      ]);
+
+  async function askModel(q: string) {
+    const earlier = history();
+    setThread((t) => [...t, { question: q, lines: [], pending: true }]);
+    const settle = (reply: Reply) => setThread((t) => [...t.slice(0, -1), reply]);
+    try {
+      const { data } = await apiSend<{ answer: string; model: string }>('/api/workspace/ask', 'POST', {
+        mode: 'owner',
+        question: q,
+        history: earlier,
+      });
+      settle({ question: q, lines: data!.answer.split(/\n+/).filter(Boolean), model: data!.model });
+    } catch (error) {
+      settle({
+        question: q,
+        lines: [
+          error instanceof ApiError ? error.message : 'Connecta AI didn’t answer. Try again in a moment.',
+        ],
+        error: true,
+      });
+    }
+  }
 
   function ask(question: string) {
     const q = question.trim();
-    if (!q) return;
-    const known = list().find((x) => x.text.toLowerCase() === q.toLowerCase());
-    setReply(
-      known?.answer() ?? {
-        question: q,
-        lines: [
-          'Connecta AI can’t answer questions of your own yet. It can answer the ones below from your profile.',
-        ],
-      },
-    );
+    if (!q || busy()) return;
     setText('');
+    const known = list().find((x) => x.text.toLowerCase() === q.toLowerCase());
+    if (known) {
+      setThread((t) => [...t, { ...known.answer(), model: null }]);
+      return;
+    }
+    if (!props.workspace.ai.enabled) {
+      setThread((t) => [
+        ...t,
+        {
+          question: q,
+          lines: [
+            'No language model is connected, so Connecta AI can only answer the questions below, from your profile.',
+          ],
+          error: true,
+        },
+      ]);
+      return;
+    }
+    void askModel(q);
   }
 
   function onSubmit(event: SubmitEvent) {
@@ -156,7 +209,12 @@ export function AssistantPrompt(props: { workspace: Workspace }) {
           onInput={(e) => setText(e.currentTarget.value)}
           onKeyDown={onKeyDown}
         />
-        <button type="submit" class="btn btn-square btn-primary" aria-label="Ask" disabled={!text().trim()}>
+        <button
+          type="submit"
+          class="btn btn-square btn-primary"
+          aria-label="Ask"
+          disabled={!text().trim() || busy()}
+        >
           <SendIcon class="size-4" />
         </button>
       </form>
@@ -176,27 +234,49 @@ export function AssistantPrompt(props: { workspace: Workspace }) {
         </For>
       </ul>
 
-      <Show when={reply()}>
-        {(r) => (
-          <Card class="w-full max-w-2xl text-left" label="Connecta AI">
-            <div role="status" class="flex flex-col gap-2">
-              <p class="font-semibold">{r().question}</p>
-              <For each={r().lines}>{(line) => <p class="text-sm text-base-content/80">{line}</p>}</For>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <Show when={r().link}>
-                {(link) => (
-                  <a href={link().href} class="btn btn-sm btn-primary">
-                    {link().label}
-                  </a>
-                )}
-              </Show>
-              <button type="button" class="btn btn-ghost btn-sm" onClick={() => setReply(null)}>
-                Close
-              </button>
-            </div>
-          </Card>
-        )}
+      <Show when={thread().length}>
+        <Card
+          class="w-full max-w-2xl text-left"
+          label="Connecta AI"
+          aside={props.workspace.ai.model ? `Typed questions: ${props.workspace.ai.model}` : undefined}
+        >
+          <ol class="flex flex-col gap-5" aria-live="polite">
+            <For each={thread()}>
+              {(r) => (
+                <li class="flex flex-col gap-2">
+                  <p class="font-semibold">{r.question}</p>
+                  <Show
+                    when={!r.pending}
+                    fallback={<span class="loading loading-dots loading-sm" aria-label="Thinking" />}
+                  >
+                    <For each={r.lines}>
+                      {(line) => (
+                        <p class={['text-sm', r.error ? 'text-base-content/60' : 'text-base-content/80']}>
+                          {line}
+                        </p>
+                      )}
+                    </For>
+                    <Show when={r.link}>
+                      {(link) => (
+                        <a href={link().href} class="btn btn-sm btn-primary self-start">
+                          {link().label}
+                        </a>
+                      )}
+                    </Show>
+                    <Show when={!r.error}>
+                      <p class="text-xs text-base-content/40">
+                        {r.model ? `Written by ${r.model} from your profile` : 'From your profile'}
+                      </p>
+                    </Show>
+                  </Show>
+                </li>
+              )}
+            </For>
+          </ol>
+          <button type="button" class="btn btn-ghost btn-sm self-start" onClick={() => setThread([])}>
+            Clear
+          </button>
+        </Card>
       </Show>
     </section>
   );

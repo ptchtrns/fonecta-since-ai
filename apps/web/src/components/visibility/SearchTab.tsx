@@ -29,11 +29,15 @@ export function SearchTab(props: { workspace: Workspace }) {
           <StatCard
             label="Reviews"
             value={reviews().count ? `${reviews().averageRating.toFixed(1)} ★` : '—'}
-            text={
+            text={`${
               reviews().count
-                ? `From ${reviews().count} ${reviews().count === 1 ? 'review' : 'reviews'}`
+                ? `From ${reviews().count} ${reviews().count === 1 ? 'review' : 'reviews'}.`
                 : 'No reviews yet. Google ranks reviewed places higher.'
-            }
+            }${
+              presence().peerReviews
+                ? ` Similar businesses: ${Math.round(presence().peerReviews!.count)}, ${presence().peerReviews!.averageRating.toFixed(1)} ★.`
+                : ''
+            }`}
           />
           <StatCard
             label="Points to gain"

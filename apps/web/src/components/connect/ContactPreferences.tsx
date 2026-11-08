@@ -2,7 +2,7 @@ import { revalidate } from '@solidjs/router';
 import { For, Show } from 'solid-js';
 import { FormMessage } from '~/components/FormMessage';
 import { Panel } from '~/components/connect/Page';
-import { MessageSettings } from '~/components/integrations/MessageSettings';
+import { MessageSettings } from '~/components/connections/MessageSettings';
 import { contactChannels, type ContactChannel } from '~/db/schema';
 import { apiSend } from '~/lib/api';
 import { createFormState } from '~/lib/form';

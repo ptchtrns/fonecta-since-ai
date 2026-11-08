@@ -1,6 +1,13 @@
 import 'server-only';
 import { and, desc, eq, gte, isNotNull, lte, ne, sql } from 'drizzle-orm';
-import { calendarSpecialDay, listing, publisherSuggestion, review, type HolidayHours } from '~/db/schema';
+import {
+  calendarSpecialDay,
+  entity,
+  listing,
+  publisherSuggestion,
+  review,
+  type HolidayHours,
+} from '~/db/schema';
 import { dayToText, formatDay, formatHours, shiftDate, WEEKDAYS, weekToText } from '~/lib/hours';
 import {
   aiReport,
@@ -11,15 +18,20 @@ import {
   searchReport,
   type Facts,
   type ListingSite,
+  type PeerReviews,
+  bySpeed,
 } from '~/lib/visibility';
 import { db } from '~/server/db';
 import {
+  getEntity,
   listings as yextListings,
+  publisherName,
   reviews as yextReviews,
-  siteOf,
   waitingPublisherSuggestions,
 } from '~/server/yext';
 import type { Business } from '~/services/business.service';
+import { answeredEditIds } from '~/services/edits.service';
+import { siteWithSpeed, updateSpeeds } from '~/services/sites.service';
 import { today } from '~/services/suggestions.service';
 
 // Where the business shows up and what customers say about it. The dataset has listings, reviews and Google users'
@@ -38,15 +50,14 @@ const SITE_NAMES: Record<string, { name: string; logo?: string }> = {
 };
 
 /** A site's short name from its publisher id, for reviews and edits that only have the id. */
-const siteName = (publisherId: string) =>
-  SITE_NAMES[publisherId]?.name ?? siteOf({ publisherId, status: 'LIVE' }).name;
+const siteName = (publisherId: string) => SITE_NAMES[publisherId]?.name ?? publisherName({ publisherId });
 
 function toSite(raw: {
   publisherId: string;
   name: string;
   status: string;
-  needsAccount: boolean;
-  seconds: number;
+  needsAccount: boolean | null;
+  seconds: number | null;
 }): ListingSite {
   const known = SITE_NAMES[raw.publisherId];
   const name = known?.name ?? raw.name;
@@ -63,13 +74,14 @@ function toSite(raw: {
 
 /** Every site the business is listed on, live ones first and fastest first. */
 async function listingsOf(business: Business): Promise<ListingSite[]> {
+  const speeds = business.source === 'yext' ? await updateSpeeds() : new Map<string, number>();
   const raw =
     business.source === 'yext'
       ? ((await yextListings('yext', business.id)) ?? []).map((l) => ({
           publisherId: l.publisherId,
           status: l.status,
           needsAccount: l.additionalStatus === 'NOT_CONNECTED',
-          ...siteOf(l),
+          ...siteWithSpeed(l, speeds),
         }))
       : (
           await db
@@ -81,8 +93,55 @@ async function listingsOf(business: Business): Promise<ListingSite[]> {
             })
             .from(listing)
             .where(eq(listing.entityId, business.id))
-        ).map((l) => ({ ...l, needsAccount: false }));
-  return raw.map(toSite).sort((a, b) => Number(b.live) - Number(a.live) || a.seconds - b.seconds);
+        )
+          // The dataset's listings don't say whether the owner's own account is linked.
+          .map((l) => ({ ...l, needsAccount: null }));
+  return raw.map(toSite).sort((a, b) => Number(b.live) - Number(a.live) || bySpeed(a, b));
+}
+
+/** Fewest similar businesses with reviews before their median is used as the target. */
+const MIN_PEERS = 5;
+
+/** The median review count and average rating among businesses of the same type in the same country. */
+async function peerReviewsOf(business: Business): Promise<PeerReviews | null> {
+  const rows = await db
+    .select({
+      count: sql<number>`count(${review.id})`,
+      averageRating: sql<number | null>`avg(${review.rating})`,
+    })
+    .from(entity)
+    .leftJoin(review, eq(review.entityId, entity.id))
+    .where(
+      and(
+        eq(entity.segment, business.segment),
+        eq(entity.country, business.country),
+        ne(entity.id, business.id),
+        // Only the dataset's own businesses: shopping centres and other Yext copies aren't peers.
+        sql`${entity.split} not in ('reference', 'yext')`,
+      ),
+    )
+    .groupBy(entity.id);
+  const reviewed = rows.filter((r) => r.count > 0);
+  if (reviewed.length < MIN_PEERS) return null;
+  const counts = rows.map((r) => r.count).sort((a, b) => a - b);
+  const mid = counts.length / 2;
+  const median = counts.length % 2 ? counts[Math.floor(mid)]! : (counts[mid - 1]! + counts[mid]!) / 2;
+  return {
+    count: median,
+    averageRating: reviewed.reduce((sum, r) => sum + (r.averageRating ?? 0), 0) / reviewed.length,
+    businesses: rows.length,
+  };
+}
+
+/**
+ * Whether a category is set where the business is kept. The dataset's businesses have one. A Yext business's
+ * category is Fonecta's own code, which this app can't name, so its type here is read from its name.
+ */
+async function categoryOf(business: Business) {
+  if (business.source !== 'yext') return { categorySet: true, categoryGuessed: false };
+  const found = await getEntity('yext', business.id);
+  const ids = [...Object.values(found?.categories ?? {}).flat(), ...(found?.categoryIds ?? [])];
+  return { categorySet: ids.length > 0, categoryGuessed: true };
 }
 
 export type RecentReview = { rating: number; content: string; author: string; date: string; site: string };
@@ -166,10 +225,18 @@ function safeParse(text: string): unknown {
   }
 }
 
-export type GoogleEdit = { id: string; site: string; field: string; created: string; change: string };
+export type GoogleEdit = {
+  id: string;
+  kind: 'hours' | 'closure';
+  site: string;
+  field: string;
+  created: string;
+  change: string;
+};
 
 /** Edits that Google users and other sites suggested, waiting for the owner's answer. */
 async function googleEditsOf(business: Business): Promise<GoogleEdit[]> {
+  const answered = await answeredEditIds(business.id);
   const rows =
     business.source === 'yext'
       ? ((await waitingPublisherSuggestions('yext', business.id)) ?? []).map((s) => ({
@@ -195,13 +262,16 @@ async function googleEditsOf(business: Business): Promise<GoogleEdit[]> {
             ),
           )
           .orderBy(desc(publisherSuggestion.dateCreated));
-  return rows.map((r) => ({
-    id: r.id,
-    site: siteName(r.publisherId),
-    field: r.fieldName,
-    created: r.dateCreated,
-    change: describeEdit(r.fieldName, r.suggestedContent),
-  }));
+  return rows
+    .filter((r) => !answered.has(r.id))
+    .map((r) => ({
+      id: r.id,
+      kind: r.fieldName === 'closed' ? ('closure' as const) : ('hours' as const),
+      site: siteName(r.publisherId),
+      field: r.fieldName,
+      created: r.dateCreated,
+      change: describeEdit(r.fieldName, r.suggestedContent),
+    }));
 }
 
 /** Public holidays soon, on days the business is normally open, that have no hours entered. */
@@ -227,16 +297,19 @@ async function missingHolidaysOf(business: Business) {
 
 /** Listings, reviews, waiting edits and the three scores, for the front page, Visibility and Reports. */
 export async function getPresence(business: Business) {
-  const [listings, reviews, googleEdits, missingHolidays] = await Promise.all([
+  const [listings, reviews, googleEdits, missingHolidays, peerReviews, category] = await Promise.all([
     listingsOf(business),
     reviewsOf(business),
     googleEditsOf(business),
     missingHolidaysOf(business),
+    peerReviewsOf(business),
+    categoryOf(business),
   ]);
   const from = today();
   const facts: Facts = {
     name: business.name,
     category: business.category,
+    ...category,
     city: business.city,
     addressLine1: business.addressLine1,
     phone: business.phone,
@@ -250,6 +323,7 @@ export async function getPresence(business: Business) {
     missingHolidays,
     listings,
     reviews,
+    peerReviews,
   };
   return {
     listings,
@@ -260,6 +334,7 @@ export async function getPresence(business: Business) {
     search: searchReport(facts),
     ai: aiReport(facts),
     /** For the preview of the Google result. */
-    openingNow: openingLine(opening(facts.hours, facts.timezone, new Date())),
+    openingNow: openingLine(opening(facts.hours, facts.timezone, new Date(), facts.holidayHours)),
+    peerReviews,
   };
 }

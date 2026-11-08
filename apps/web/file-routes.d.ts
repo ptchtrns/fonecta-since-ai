@@ -151,6 +151,19 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/api/workspace/ai-answers";
+      page: false;
+      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/ai-answers"), Extract<"GET", keyof typeof import("./src/routes/api/workspace/ai-answers")>>>;
+      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/ai-answers"), Extract<"GET", keyof typeof import("./src/routes/api/workspace/ai-answers")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/ask";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/ask"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/ask")>>>;
+      $$route?: undefined;
+    },
+    {
       path: "/api/workspace/business";
       page: false;
       $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/business"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/business")>>>;
@@ -160,6 +173,12 @@ declare module "virtual:file-routes" {
       path: "/api/workspace/contact";
       page: false;
       $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/contact"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/contact")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/edits/:id";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/edits/[id]"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/edits/[id]")>>>;
       $$route?: undefined;
     },
     {
@@ -229,16 +248,16 @@ declare module "virtual:file-routes" {
       $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/company"), Extract<"route", keyof typeof import("./src/routes/dashboard/company")>>>;
     },
     {
+      path: "/dashboard/connections";
+      page: true;
+      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/connections"), Extract<"default", keyof typeof import("./src/routes/dashboard/connections")>>>;
+      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/connections"), Extract<"route", keyof typeof import("./src/routes/dashboard/connections")>>>;
+    },
+    {
       path: "/dashboard/";
       page: true;
       $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/index"), Extract<"default", keyof typeof import("./src/routes/dashboard/index")>>>;
       $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/index"), Extract<"route", keyof typeof import("./src/routes/dashboard/index")>>>;
-    },
-    {
-      path: "/dashboard/integrations";
-      page: true;
-      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"default", keyof typeof import("./src/routes/dashboard/integrations")>>>;
-      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"route", keyof typeof import("./src/routes/dashboard/integrations")>>>;
     },
     {
       path: "/dashboard/reports";
@@ -355,11 +374,11 @@ declare module "virtual:file-routes" {
           children?: undefined;
         },
         {
-          path: "/integrations";
-          id: "/integrations";
+          path: "/connections";
+          id: "/connections";
           page: true;
-          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"default", keyof typeof import("./src/routes/dashboard/integrations")>>>;
-          $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"route", keyof typeof import("./src/routes/dashboard/integrations")>>>;
+          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/connections"), Extract<"default", keyof typeof import("./src/routes/dashboard/connections")>>>;
+          $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/connections"), Extract<"route", keyof typeof import("./src/routes/dashboard/connections")>>>;
           children?: undefined;
         }
       ];

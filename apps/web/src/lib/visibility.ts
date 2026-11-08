@@ -1,7 +1,8 @@
 // How findable a business is: how complete its profile is, how well it can rank in local search, what AI assistants
 // can say about it, and which sites it is listed on. Every check reads data Connect already has (the profile,
-// Yext's listings and reviews), so nothing here is guessed.
-import { formatHours, WEEKDAYS, type Weekday } from '~/lib/hours';
+// Yext's listings and reviews, and how similar businesses do). The points per check are rules of thumb on what
+// Google and assistants weigh; the review target comes from similar businesses where there are enough of them.
+import { formatHours, shiftDate, WEEKDAYS, type Weekday } from '~/lib/hours';
 
 /** Where a missing item is fixed: the business details, or the suggestions on the front page. */
 export type Fix = 'company' | 'suggestions';
@@ -15,15 +16,25 @@ export type ListingSite = {
   logo: string;
   status: string;
   live: boolean;
-  /** Listed, but the owner's own account there isn't linked, so they can't reply to reviews there. */
-  needsAccount: boolean;
-  /** How long a change typically takes to show there. */
-  seconds: number;
+  /**
+   * Listed, but the owner's own account there isn't linked, so they can't reply to reviews there. Null when the
+   * source doesn't say: Yext reports it, the dataset's listings don't.
+   */
+  needsAccount: boolean | null;
+  /** How long a change typically takes to show there, or null when no figure is known for the site. */
+  seconds: number | null;
 };
+
+/** What similar businesses have: the median review count and average rating among the same type in the country. */
+export type PeerReviews = { count: number; averageRating: number; businesses: number };
 
 export type Facts = {
   name: string;
   category: string;
+  /** Whether a category is set where the business's details are kept (Yext, or the dataset). */
+  categorySet: boolean;
+  /** True when `category` was read from the name, because the category set in Yext is Fonecta's own code. */
+  categoryGuessed: boolean;
   city: string;
   addressLine1: string;
   phone: string;
@@ -38,6 +49,8 @@ export type Facts = {
   missingHolidays: { date: string; label: string }[];
   listings: ListingSite[];
   reviews: { count: number; averageRating: number };
+  /** Null when too few similar businesses have reviews to compare with. */
+  peerReviews: PeerReviews | null;
 };
 
 /** Days ahead the holiday hours check looks at. */
@@ -45,6 +58,16 @@ export const HOLIDAY_WINDOW_DAYS = 60;
 /** Characters of description Google rewards, and the most it shows. */
 const SEO_DESCRIPTION = 250;
 const AI_DESCRIPTION = 80;
+/** Reviews to aim for when there are too few similar businesses to compare with, and the fewest ever asked for. */
+const DEFAULT_REVIEW_TARGET = 10;
+const MIN_REVIEW_TARGET = 3;
+/** Google's own "4.0+" rating filter. */
+const RATING_TARGET = 4;
+
+/** How many reviews count as enough: what the typical similar business has, or a rule of thumb without peers. */
+export function reviewTarget(peers: PeerReviews | null): number {
+  return peers ? Math.max(MIN_REVIEW_TARGET, Math.round(peers.count)) : DEFAULT_REVIEW_TARGET;
+}
 
 const scoreOf = (checks: Check[]) => checks.reduce((sum, c) => sum + (c.done ? c.points : 0), 0);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -137,10 +160,12 @@ export function searchReport(f: Facts): Report {
     {
       key: 'category',
       label: 'Business category',
-      detail: f.category
-        ? `Listed as ${f.category.toLowerCase()}, so you show up for those searches.`
-        : 'No category, so Google can’t match you to searches like "lunch near me".',
-      done: !!f.category,
+      detail: !f.categorySet
+        ? 'No category, so Google can’t match you to searches like "lunch near me".'
+        : f.categoryGuessed
+          ? `A category is set in Yext. Connecta AI reads you as ${withArticle(f.category.toLowerCase())} from your name.`
+          : `Listed as ${f.category.toLowerCase()}, so you show up for those searches.`,
+      done: f.categorySet,
       points: 10,
     },
     {
@@ -203,25 +228,42 @@ export function searchReport(f: Facts): Report {
     {
       key: 'reviews',
       label: 'Reviews',
-      detail: f.reviews.count
-        ? `${plural(f.reviews.count, 'review')}, ${f.reviews.averageRating.toFixed(1)} ★ on average. Ten or more at 4 ★ help ranking.`
-        : 'No reviews yet. Reviews are one of the biggest local ranking signals.',
-      done: f.reviews.count >= 10 && f.reviews.averageRating >= 4,
+      detail: reviewsDetail(f),
+      done: f.reviews.count >= reviewTarget(f.peerReviews) && f.reviews.averageRating >= RATING_TARGET,
       points: 15,
     },
-    {
-      key: 'google',
-      label: 'Google account linked',
-      detail: !b.google?.live
-        ? 'Not live on Google yet.'
-        : b.google.needsAccount
-          ? 'Live, but your own Google account isn’t linked, so you can’t reply to reviews there.'
-          : 'Live and linked.',
-      done: !!b.google?.live && !b.google.needsAccount,
-      points: 5,
-    },
+    // The dataset's listings don't say whether the owner's account is linked, so then only being live counts.
+    b.google?.needsAccount === null
+      ? {
+          key: 'google',
+          label: 'Live on Google',
+          detail: b.google.live ? 'Your profile shows on Google Search and Maps.' : 'Not live on Google yet.',
+          done: b.google.live,
+          points: 5,
+        }
+      : {
+          key: 'google',
+          label: 'Google account linked',
+          detail: !b.google?.live
+            ? 'Not live on Google yet.'
+            : b.google.needsAccount
+              ? 'Live, but your own Google account isn’t linked, so you can’t reply to reviews there.'
+              : 'Live and linked.',
+          done: !!b.google?.live && !b.google.needsAccount,
+          points: 5,
+        },
   ];
   return { score: scoreOf(checks), checks };
+}
+
+function reviewsDetail(f: Facts): string {
+  const target = reviewTarget(f.peerReviews);
+  const peers = f.peerReviews
+    ? `The typical ${f.category.toLowerCase()} in your country has ${plural(Math.round(f.peerReviews.count), 'review')} (the median across ${f.peerReviews.businesses}), ${f.peerReviews.averageRating.toFixed(1)} ★ on average.`
+    : `${target} or more at ${RATING_TARGET} ★ help ranking.`;
+  if (!f.reviews.count) return `No reviews yet. ${peers}`;
+  const yours = `${plural(f.reviews.count, 'review')}, ${f.reviews.averageRating.toFixed(1)} ★ on average.`;
+  return `${yours} ${peers}${f.peerReviews ? ` Aim for ${target} at ${RATING_TARGET} ★ or better.` : ''}`;
 }
 
 // Where assistants read business data from.
@@ -233,17 +275,24 @@ const ASSISTANTS = [
 
 export type Answer = { question: string; answer: string; known: boolean };
 
-/** Weekday and HH:MM where the business is. */
-function localNow(now: Date, timezone: string): { weekday: Weekday; time: string } {
+/** Date, weekday and HH:MM where the business is. */
+function localNow(now: Date, timezone: string): { date: string; weekday: Weekday; time: string } {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     weekday: 'long',
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
   }).formatToParts(now);
   const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  return { weekday: part('weekday').toLowerCase() as Weekday, time: `${part('hour')}:${part('minute')}` };
+  return {
+    date: `${part('year')}-${part('month')}-${part('day')}`,
+    weekday: part('weekday').toLowerCase() as Weekday,
+    time: `${part('hour')}:${part('minute')}`,
+  };
 }
 
 const intervalsOf = (hours: string) =>
@@ -254,21 +303,39 @@ const intervalsOf = (hours: string) =>
         return { open, close };
       });
 
-/** Whether the business is open now, and if not, when it next opens. Null when it has no opening hours. */
+/**
+ * Whether the business is open now, and if not, when it next opens. Null when it has no opening hours. `holiday` is
+ * true when today's hours are a special day's, as Google marks them.
+ */
 export type Opening =
-  | { open: true; until: string }
-  | { open: false; day: Weekday; today: boolean; at: string }
+  | { open: true; until: string; holiday: boolean }
+  | { open: false; day: Weekday; today: boolean; at: string; holiday: boolean }
   | null;
 
-export function opening(hours: Record<Weekday, string>, timezone: string, now: Date): Opening {
-  const { weekday, time } = localNow(now, timezone);
-  const current = intervalsOf(hours[weekday]).find((i) => time >= i.open && time < i.close);
-  if (current) return { open: true, until: current.close };
+/** Days ahead to look for the next opening: a week, plus a holiday or two on the way. */
+const OPENING_LOOKAHEAD_DAYS = 14;
+
+export function opening(
+  hours: Record<Weekday, string>,
+  timezone: string,
+  now: Date,
+  special: { date: string; hours: string }[] = [],
+): Opening {
+  const { date, weekday, time } = localNow(now, timezone);
+  const byDate = new Map(special.map((s) => [s.date, s.hours]));
   const start = WEEKDAYS.indexOf(weekday);
-  for (let i = 0; i < 7; i++) {
+  const dayAt = (i: number) => {
     const day = WEEKDAYS[(start + i) % 7]!;
-    const next = intervalsOf(hours[day]).find((x) => i > 0 || time < x.open);
-    if (next) return { open: false, day, today: i === 0, at: next.open };
+    const exception = byDate.get(shiftDate(date, i));
+    return { day, hours: exception ?? hours[day], holiday: exception !== undefined };
+  };
+  const today = dayAt(0);
+  const current = intervalsOf(today.hours).find((i) => time >= i.open && time < i.close);
+  if (current) return { open: true, until: current.close, holiday: today.holiday };
+  for (let i = 0; i < OPENING_LOOKAHEAD_DAYS; i++) {
+    const { day, hours: text } = dayAt(i);
+    const next = intervalsOf(text).find((x) => i > 0 || time < x.open);
+    if (next) return { open: false, day, today: i === 0, at: next.open, holiday: today.holiday };
   }
   return null;
 }
@@ -278,12 +345,14 @@ const dayName = (day: Weekday) => `${day.charAt(0).toUpperCase()}${day.slice(1)}
 /** How Google's result puts it: "Open · Closes 14:30", "Closed · Opens Wed 10:30". */
 export function openingLine(o: Opening): string {
   if (!o) return 'No opening hours';
-  if (o.open) return `Open · Closes ${o.until}`;
-  return `Closed · Opens ${o.today ? '' : `${dayName(o.day).slice(0, 3)} `}${o.at}`;
+  const line = o.open
+    ? `Open · Closes ${o.until}`
+    : `Closed · Opens ${o.today ? '' : `${dayName(o.day).slice(0, 3)} `}${o.at}`;
+  return o.holiday ? `${line} · Holiday hours` : line;
 }
 
 function openNowAnswer(f: Facts, now: Date): string {
-  const o = opening(f.hours, f.timezone, now);
+  const o = opening(f.hours, f.timezone, now, f.holidayHours);
   if (o?.open) return `Yes, it’s open until ${o.until} today.`;
   if (!o) return 'No, it’s closed right now.';
   return `No, it’s closed right now. It opens ${o.today ? 'today' : `on ${dayName(o.day)}`} at ${o.at}.`;
@@ -397,11 +466,38 @@ export function aiReport(f: Facts, now = new Date()): Report & { answers: Answer
   return { score: scoreOf(checks), checks, answers };
 }
 
+/** Where the dataset's Connect sends business data for AI assistants directly, besides the three sites. */
+const AI_FEED = 'CHATGPT_SEARCH';
+
+export type AssistantSource = {
+  site: string;
+  assistants: string;
+  /** The listing's status there: live, waiting, opted out, or not listed at all. */
+  status: 'live' | 'waiting' | 'opted out' | 'not listed';
+};
+
+/** Each source assistants read, with the business's listing status there. */
+export function assistantSources(listings: ListingSite[]): AssistantSource[] {
+  const statusOf = (publisherId: string): AssistantSource['status'] => {
+    const found = listings.find((l) => l.publisherId === publisherId);
+    if (!found) return 'not listed';
+    if (found.live) return 'live';
+    return found.status === 'OPTED_OUT' ? 'opted out' : 'waiting';
+  };
+  const feed = listings.find((l) => l.publisherId === AI_FEED);
+  return [
+    ...ASSISTANTS.map((a) => ({ site: a.site, assistants: a.assistants, status: statusOf(a.publisherId) })),
+    ...(feed
+      ? [{ site: 'AI feed', assistants: 'ChatGPT and other assistants', status: statusOf(AI_FEED) }]
+      : []),
+  ];
+}
+
 /** Assistants that read a site the business is live on. */
 export function assistantsReached(listings: ListingSite[]): string[] {
-  return ASSISTANTS.filter((a) => listings.some((l) => l.publisherId === a.publisherId && l.live)).map(
-    (a) => a.assistants,
-  );
+  return assistantSources(listings)
+    .filter((a) => a.status === 'live')
+    .map((a) => a.assistants);
 }
 
 /** The missing item worth the most points, preferring one the owner can fix in the app. */
@@ -425,7 +521,8 @@ export function formatDuration(seconds: number): string {
 }
 
 /** "Updates within an hour", "Updates within 3 days". */
-export function updateSpeed(seconds: number): string {
+export function updateSpeed(seconds: number | null): string {
+  if (seconds === null) return 'Update speed not known';
   if (seconds <= HOUR) return 'Updates within an hour';
   if (seconds <= DAY) return 'Updates within a day';
   return `Updates within ${formatDuration(seconds)}`;
@@ -433,25 +530,39 @@ export function updateSpeed(seconds: number): string {
 
 export type SpeedGroup = { label: string; sites: ListingSite[] };
 
-/** Live sites by how soon a change shows there. */
+/** Sites with a known speed first, fastest first. */
+export const bySpeed = (a: { seconds: number | null }, b: { seconds: number | null }) =>
+  (a.seconds ?? Number.POSITIVE_INFINITY) - (b.seconds ?? Number.POSITIVE_INFINITY);
+
+/** Live sites by how soon a change shows there. Sites without a known speed get their own group, if any. */
 export function speedGroups(listings: ListingSite[]): SpeedGroup[] {
-  const live = listings.filter((l) => l.live).sort((a, b) => a.seconds - b.seconds);
+  const live = listings.filter((l) => l.live).sort(bySpeed);
+  const within = (test: (s: number) => boolean) => live.filter((l) => l.seconds !== null && test(l.seconds));
+  const unknown = live.filter((l) => l.seconds === null);
   return [
-    { label: 'Within an hour', sites: live.filter((l) => l.seconds <= HOUR) },
-    { label: 'Within a day', sites: live.filter((l) => l.seconds > HOUR && l.seconds <= DAY) },
-    { label: 'Within a few days', sites: live.filter((l) => l.seconds > DAY) },
+    { label: 'Within an hour', sites: within((s) => s <= HOUR) },
+    { label: 'Within a day', sites: within((s) => s > HOUR && s <= DAY) },
+    { label: 'Within a few days', sites: within((s) => s > DAY) },
+    ...(unknown.length ? [{ label: 'Speed not known', sites: unknown }] : []),
   ];
 }
 
 /** The numbers the Listings tab leads with. */
 export function listingsSummary(listings: ListingSite[]) {
   const live = listings.filter((l) => l.live);
+  const known = live.flatMap((l) => (l.seconds === null ? [] : [l.seconds]));
+  const reportsAccounts = listings.some((l) => l.needsAccount !== null);
   return {
     live: live.length,
     total: listings.length,
-    needsAccount: listings.filter((l) => l.needsAccount).length,
-    /** How long until a change shows on every live site: the slowest one. */
-    slowestSeconds: Math.max(0, ...live.map((l) => l.seconds)),
+    /** Null when no listing says whether the owner's account is linked. */
+    needsAccount: reportsAccounts ? listings.filter((l) => l.needsAccount).length : null,
+    /** Listed but not live: waiting for the site, or opted out. */
+    notLive: listings.length - live.length,
+    /** How long until a change shows on every live site with a known speed: the slowest of them. */
+    slowestSeconds: Math.max(0, ...known),
+    /** Live sites with no known update speed, left out of `slowestSeconds`. */
+    unknownSpeed: live.length - known.length,
   };
 }
 

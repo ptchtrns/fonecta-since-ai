@@ -3,9 +3,10 @@ import type { RouteDefinition } from '@solidjs/router';
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { AssistantPrompt } from '~/components/connect/AssistantPrompt';
 import { CompactChecklist } from '~/components/connect/Checklist';
+import { GoogleEdits } from '~/components/connect/GoogleEdits';
 import { ArrowRightIcon } from '~/components/connect/icons';
 import { Card, eyebrow, Meter, StatCard } from '~/components/connect/Metrics';
-import { Page, PageHeader, Panel } from '~/components/connect/Page';
+import { Page, Panel } from '~/components/connect/Page';
 import { BrandMark, LogoStrip } from '~/components/connect/PublisherLogo';
 import { SuggestionCard } from '~/components/connect/SuggestionCard';
 import { formatDay, formatHours } from '~/lib/hours';
@@ -47,20 +48,6 @@ export default function FrontPage() {
   return (
     <Page>
       <Title>{`${workspace().business.name} · Connecta AI`}</Title>
-      <PageHeader
-        title={workspace().business.name}
-        subtitle={[
-          workspace().business.category,
-          `${workspace().business.addressLine1}, ${workspace().business.city}`,
-        ]
-          .filter(Boolean)
-          .join(' · ')}
-        actions={
-          <a href="/dashboard/company" class="btn btn-sm btn-ghost border-base-300">
-            Company information
-          </a>
-        }
-      />
       <AssistantPrompt workspace={workspace()} />
 
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -79,7 +66,11 @@ export default function FrontPage() {
         <StatCard
           label="Published"
           value={stats().published}
-          text="Changes live everywhere"
+          text={
+            stats().approvedNotLive
+              ? `Sent to Yext. ${stats().approvedNotLive} more approved, saved here until Yext is connected`
+              : 'Changes Yext confirmed'
+          }
           href="/dashboard/reports"
         />
         <StatCard
@@ -159,24 +150,7 @@ export default function FrontPage() {
             <ReviewsCard reviews={presence().reviews} />
 
             <Show when={presence().googleEdits.length}>
-              <Card label="Suggested edits" aside={String(presence().googleEdits.length)}>
-                <ul class="flex flex-col gap-3 text-sm">
-                  <For each={presence().googleEdits}>
-                    {(edit) => (
-                      <li class="flex flex-col">
-                        <span class="font-medium">{edit.change}</span>
-                        <span class="text-xs text-base-content/50">
-                          Suggested on {edit.site}, {formatDay(edit.created)}
-                        </span>
-                      </li>
-                    )}
-                  </For>
-                </ul>
-                <p class="text-xs text-base-content/50">
-                  People suggested these changes to your listing on Google and other sites. They wait for your
-                  answer, and Connecta AI weighs them in its suggestions.
-                </p>
-              </Card>
+              <GoogleEdits edits={presence().googleEdits} onAnswered={setNotice} />
             </Show>
           </div>
         </div>
@@ -235,7 +209,7 @@ function ConnectionsCard(props: { workspace: Workspace }) {
       label="Connections"
       aside={
         <a
-          href="/dashboard/integrations"
+          href="/dashboard/connections"
           class="flex items-center gap-1 font-medium text-base-content hover:underline"
         >
           Manage <ArrowRightIcon />
@@ -254,7 +228,7 @@ function ConnectionsCard(props: { workspace: Workspace }) {
               <Show
                 when={c.on}
                 fallback={
-                  <a href="/dashboard/integrations" class="btn btn-xs btn-ghost border-base-300">
+                  <a href="/dashboard/connections" class="btn btn-xs btn-ghost border-base-300">
                     Set up
                   </a>
                 }

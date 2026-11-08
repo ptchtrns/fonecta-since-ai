@@ -4,6 +4,7 @@ import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import {
   businessProfile,
   category,
+  publisherSuggestionAnswer,
   customerContact,
   entity,
   listing,
@@ -17,7 +18,8 @@ import { WEEKDAYS, textToDay, weekToText } from '~/lib/hours';
 import { ok, err } from '~/lib/result';
 import type { BusinessEditPayload } from '~/schemas/business.schema';
 import { db } from '~/server/db';
-import { liveListings, updateEntity, type BusinessSource } from '~/server/yext';
+import { listings, updateEntity, type BusinessSource, type Site } from '~/server/yext';
+import { liveYextSites } from '~/services/sites.service';
 import { fold, searchYextBusinesses, syncYextBusiness } from '~/services/yext-business.service';
 
 const MAX_RESULTS = 20;
@@ -108,6 +110,45 @@ export function withApproved(existing: HolidayHours[], approved: { date: string;
   return [...days.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** A JSON column's value, which may come as text. */
+export const parseContent = (content: unknown): unknown => {
+  if (typeof content !== 'string') return content;
+  try {
+    return JSON.parse(content);
+  } catch {
+    return content;
+  }
+};
+
+/** The hours with a site's suggested change on top: its weekdays, and its dates in place of the same dates. */
+export function withSuggestedHours(hours: EntityHours, suggested: unknown): EntityHours {
+  if (!suggested || typeof suggested !== 'object') return hours;
+  const change = suggested as Partial<EntityHours>;
+  const days = new Map((hours.holidayHours ?? []).map((h) => [h.date, h]));
+  for (const h of change.holidayHours ?? []) days.set(h.date, h as HolidayHours);
+  const weekdays = Object.fromEntries(WEEKDAYS.filter((d) => change[d]).map((d) => [d, change[d]]));
+  return {
+    ...hours,
+    ...weekdays,
+    holidayHours: [...days.values()].sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
+/** Accepted changes to the dataset's businesses' hours, oldest first, to apply on top of their own. */
+export async function acceptedHourEdits(entityId: string) {
+  const rows = await db
+    .select({ content: publisherSuggestionAnswer.suggestedContent, at: publisherSuggestionAnswer.createdAt })
+    .from(publisherSuggestionAnswer)
+    .where(
+      and(
+        eq(publisherSuggestionAnswer.entityId, entityId),
+        eq(publisherSuggestionAnswer.status, 'ACCEPTED'),
+        eq(publisherSuggestionAnswer.fieldName, 'hours'),
+      ),
+    );
+  return rows.toSorted((a, b) => a.at.getTime() - b.at.getTime()).map((r) => parseContent(r.content));
+}
+
 /** The business as customers should see it: the dataset's values with the owner's edits on top. */
 export async function getBusiness(entityId: string) {
   const business = await readBusiness(entityId);
@@ -153,6 +194,12 @@ async function readBusiness(entityId: string) {
     );
   const edits: BusinessEdits = row.profile?.edits ?? {};
   const e = row.entity;
+  // Changes Google users suggested and the owner accepted. A Yext business's copy already has them from Yext.
+  const accepted = e.split === 'yext' ? [] : await acceptedHourEdits(entityId);
+  const own = accepted.reduce<EntityHours>((h, change) => withSuggestedHours(h, change), {
+    ...e.hours,
+    ...edits.hours,
+  } as EntityHours);
   return {
     id: e.id,
     source: (e.split === 'yext' ? 'yext' : 'dataset') as BusinessSource,
@@ -167,10 +214,9 @@ async function readBusiness(entityId: string) {
     description: edits.description ?? e.description ?? '',
     // Everything a write to Yext has to include, since it replaces the whole hours object.
     hours: {
-      ...e.hours,
-      ...edits.hours,
+      ...own,
       holidayHours: withApproved(
-        e.hours.holidayHours ?? [],
+        own.holidayHours ?? [],
         approved.flatMap((a) => (a.hours ? [{ date: a.date, hours: a.hours }] : [])),
       ),
     } as EntityHours,
@@ -192,7 +238,7 @@ async function readBusiness(entityId: string) {
       chatId: row.profile?.telegramChatId ?? null,
       name: row.profile?.telegramName ?? null,
     },
-    // How the owner wants to be reached, from the customer record, which the owner edits on the Integrations page.
+    // How the owner wants to be reached, from the customer record, which the owner edits on the Connections page.
     // `language` and `standingPermission` apply on every channel.
     contact: {
       optedOut: row.contact?.optedOut ?? false,
@@ -209,9 +255,9 @@ async function readBusiness(entityId: string) {
 export type Business = NonNullable<Awaited<ReturnType<typeof getBusiness>>>;
 
 /** Sites the listing is live on, fastest first, with how long a change takes to show there. */
-export async function liveSites(business: Pick<Business, 'id' | 'source'>) {
+export async function liveSites(business: Pick<Business, 'id' | 'source'>): Promise<Site[]> {
   // The dataset has listings for its own businesses. For the account's, Yext itself says where they show.
-  if (business.source === 'yext') return (await liveListings('yext', business.id)) ?? [];
+  if (business.source === 'yext') return liveYextSites((await listings('yext', business.id)) ?? []);
   return db
     .select({ name: listing.publisherName, seconds: listing.typicalUpdateSpeedSeconds })
     .from(listing)

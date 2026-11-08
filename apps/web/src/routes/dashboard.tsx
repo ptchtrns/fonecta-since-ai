@@ -39,7 +39,7 @@ const pages: Link[] = [
   { href: '/dashboard/reports', label: 'Reports', icon: () => <ChartIcon /> },
 ];
 const maintenance: Link[] = [
-  { href: '/dashboard/integrations', label: 'Integrations', icon: () => <PlugIcon /> },
+  { href: '/dashboard/connections', label: 'Connections', icon: () => <PlugIcon /> },
   { href: '/dashboard/account', label: 'Account', icon: () => <UserIcon /> },
 ];
 
@@ -138,24 +138,11 @@ export default function DashboardLayout(props: ParentProps) {
                 </label>
               </div>
             </div>
-            <Show when={workspace()}>
-              {(w) => (
-                <a
-                  href="/dashboard/company"
-                  class="mt-2 block rounded-field border border-base-300 px-3 py-2 hover:bg-base-200 is-drawer-close:hidden"
-                  onClick={closeOnMobile}
-                >
-                  <span class="block truncate text-sm font-medium">{w().business.name}</span>
-                  <span class="block truncate text-xs text-base-content/60">
-                    {[w().business.category, w().business.city].filter(Boolean).join(' · ')}
-                  </span>
-                </a>
-              )}
-            </Show>
           </div>
 
           <nav class="flex grow flex-col" aria-label="Dashboard">
             <ul class="menu w-full gap-1 px-2">
+              <li class="menu-title is-drawer-close:hidden">Business</li>
               <For each={pages}>
                 {(link) => <NavItem link={link} count={counts()[link.href]} onPick={closeOnMobile} />}
               </For>
@@ -167,6 +154,20 @@ export default function DashboardLayout(props: ParentProps) {
           </nav>
 
           <div class="border-t border-base-300 p-2">
+            <Show when={workspace()}>
+              {(w) => (
+                <a
+                  href="/dashboard/company"
+                  class="mb-2 block rounded-field border border-base-300 px-3 py-2 hover:bg-base-200 is-drawer-close:hidden"
+                  onClick={closeOnMobile}
+                >
+                  <span class="block truncate text-sm font-medium">{w().business.name}</span>
+                  <span class="block truncate text-xs text-base-content/60">
+                    {[w().business.category, w().business.city].filter(Boolean).join(' · ')}
+                  </span>
+                </a>
+              )}
+            </Show>
             <div class="dropdown dropdown-top w-full is-drawer-close:dropdown-right is-drawer-close:dropdown-end">
               <div
                 tabindex="0"

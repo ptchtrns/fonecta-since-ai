@@ -54,7 +54,7 @@ type Copy = {
   connected: (business: string) => string;
   /** A Telegram start link that's no longer valid. */
   linkExpired: string;
-  /** The Integrations page's test message, on email and Telegram. */
+  /** The Connections page's test message, on email and Telegram. */
   test: (business: string) => string;
   schoolBreak: string;
   weekdays: string[];
@@ -146,7 +146,7 @@ const copy: Record<Language, Copy> = {
     standingSubject: (business) => `Vi har uppdaterat öppettiderna för ${business}`,
     answer: 'Svara',
     connected: (business) => `Klart! Vi skickar förslag om öppettiderna för ${business} hit, ett i taget.`,
-    linkExpired: 'Den här länken gäller inte längre. Öppna en ny från sidan Integrationer.',
+    linkExpired: 'Den här länken gäller inte längre. Öppna en ny från sidan Anslutningar.',
     test: (business) => `Testmeddelande: förslag för ${business} kommer hit.`,
     schoolBreak: 'Skollov',
     weekdays: ['mån', 'tis', 'ons', 'tors', 'fre', 'lör', 'sön'],
@@ -250,7 +250,7 @@ const copy: Record<Language, Copy> = {
     answer: 'Answer',
     connected: (business) =>
       `All set! Suggestions about the hours for ${business} will come here, one at a time.`,
-    linkExpired: 'This link is no longer valid. Open a new one from the Integrations page.',
+    linkExpired: 'This link is no longer valid. Open a new one from the Connections page.',
     test: (business) => `Test message: suggestions for ${business} will come here.`,
     schoolBreak: 'School break',
     weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -374,7 +374,7 @@ export function suggestionButtons(suggested: string, token: string, language: La
   ];
 }
 
-type Site = { name: string; seconds: number };
+type Site = { name: string; seconds: number | null };
 
 const HOUR = 3600;
 const DAY = 24 * HOUR;
@@ -396,9 +396,10 @@ export function confirmationMessage(
   const c = copy[language];
   const done = c.done(`${localDay(date, language)} ${localHours(hours, language)}`);
   if (!sites) return `${done} ${c.savedOnly}`;
-  const now = sites.filter((s) => s.seconds <= HOUR).map((s) => s.name);
-  const later = sites.filter((s) => s.seconds > HOUR);
-  const slowest = Math.max(0, ...later.map((s) => s.seconds));
+  // A site without a known speed is listed with the later ones, and doesn't set how long "later" is.
+  const now = sites.filter((s) => s.seconds !== null && s.seconds <= HOUR).map((s) => s.name);
+  const later = sites.filter((s) => s.seconds === null || s.seconds > HOUR);
+  const slowest = Math.max(HOUR + 1, ...later.map((s) => s.seconds ?? 0));
   return [
     done,
     now.length ? c.liveNow(now.join(', ')) : '',
@@ -411,7 +412,10 @@ export function confirmationMessage(
 /** The same fact for the dashboard: "Published to 8 sites. Google (Search & Maps) shows it within 2 min." */
 export function publishedSummary(sites: Site[] | null): string {
   if (!sites?.length) return 'Saved. It goes live once publishing to Yext is connected.';
-  const first = sites[0]!;
   const count = sites.length === 1 ? '1 site' : `${sites.length} sites`;
-  return `Published to ${count}. ${first.name} shows it within ${updateTime(first.seconds)}, the slowest within ${updateTime(sites.at(-1)!.seconds)}.`;
+  const known = sites.filter((s): s is { name: string; seconds: number } => s.seconds !== null);
+  if (!known.length) return `Published to ${count}.`;
+  const first = known[0]!;
+  const unknown = sites.length - known.length;
+  return `Published to ${count}. ${first.name} shows it within ${updateTime(first.seconds)}, the slowest within ${updateTime(known.at(-1)!.seconds)}${unknown ? `; ${unknown === 1 ? '1 site doesn’t' : `${unknown} sites don’t`} report a speed` : ''}.`;
 }
