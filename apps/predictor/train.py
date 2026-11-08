@@ -22,7 +22,9 @@ import argparse
 import csv
 import json
 import sys
+import tempfile
 import zlib
+from pathlib import Path
 
 import numpy as np
 from sklearn.ensemble import HistGradientBoostingRegressor
@@ -78,8 +80,8 @@ def main():
 
     if args.check:
         for season, windows in TRAINING.items():
-            result = check(season, rows_from(examples, windows))
-            print(f"{season} on dev businesses the model never saw: {result:.2f}")
+            predictions, data = check(season, rows_from(examples, windows))
+            report(season, predictions, data)
 
 
 def only_cached_ai_answers():
@@ -255,7 +257,8 @@ def export_tree(nodes):
 
 
 def check(season, training_rows):
-    """The season's score when each dev business is decided by a model trained without it."""
+    """The season's answers for the dev businesses, each decided by a model trained without it, and the data
+    they were decided from: (predictions, data)."""
     settings = run.SEASONS[season]
     data = load_everything(settings["snapshot"], include_live_answers=not settings["is_back_test"])
     labelled = labelled_businesses(settings["answers"])
@@ -292,7 +295,60 @@ def check(season, training_rows):
         stated = run.stated_hours_suggestion(data, business, question, shown, rejected)
         if stated:
             predictions[key] = ("SUGGEST", stated["hours"], None)
-    return score(predictions, settings["answers"])["score_0_100"]
+    return predictions, data
+
+
+def report(season, predictions, data):
+    """Prints the score, and how often the suggestions were right, for all days and split by whether the owner had
+    entered that holiday in an earlier year. Every answer an owner gives moves their days into "told before"."""
+    settings = run.SEASONS[season]
+    with open(settings["answers"], encoding="utf-8") as file:
+        labels = list(csv.DictReader(file))
+
+    told = set()
+    for entries in data["holiday_history_by_business"].values():
+        for entry in entries:
+            if entry["date"] < settings["snapshot"]:
+                told.add((entry["entity_id"], entry["day_key"]))
+    groups = {"all": labels, "told before": [], "never told": []}
+    for row in labels:
+        if (row["entity_id"], row["day_key"]) in told:
+            groups["told before"].append(row)
+        else:
+            groups["never told"].append(row)
+
+    print(f"{season} on dev businesses the model never saw:")
+    print(f"  {'':12} {'days':>6} {'score':>7} {'suggested':>10} {'exact hours':>12} {'open/closed right':>18}"
+          f" {'closed doors prevented':>23}")
+    with tempfile.TemporaryDirectory() as folder:
+        for name, rows in groups.items():
+            # The organisers' scorer reads its labels from a file.
+            path = Path(folder) / "labels.csv"
+            with open(path, "w", newline="", encoding="utf-8") as file:
+                writer = csv.DictWriter(file, fieldnames=list(labels[0]))
+                writer.writeheader()
+                writer.writerows(rows)
+            result = score(predictions, path)
+
+            suggested = exact = right_state = 0
+            for row in rows:
+                prediction = predictions.get((row["entity_id"], row["date"]))
+                if not prediction or prediction[0] != "SUGGEST":
+                    continue
+                suggested += 1
+                if row["needs_action"] == "1" and prediction[1] == row["truth_hours"]:
+                    exact += 1
+                if (prediction[1] == "closed") == (row["truth_hours"] == "closed"):
+                    right_state += 1
+            print(f"  {name:12} {len(rows):>6} {result['score_0_100']:>6.2f}% {suggested:>10}"
+                  f" {percent(exact, suggested):>12} {percent(right_state, suggested):>18}"
+                  f" {result['closed_door_views_prevented_pct']:>22.1f}%")
+
+
+def percent(count, total):
+    if not total:
+        return "-"
+    return f"{100 * count / total:.0f}%"
 
 
 def labelled_businesses(labels_path):

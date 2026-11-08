@@ -106,6 +106,8 @@ Right hours earn 1 point and hours within 30 minutes 0.6. Getting open or closed
 
 The decider's scores come from `train.py --check`, where each training business is decided by a model that never saw it, as the hidden test businesses will be. `run.py` prints higher numbers because the saved models also learned from these businesses' earlier seasons.
 
+`--check` also prints how often the suggestions were right, split by whether the owner had entered that holiday in an earlier year. Where they had, 88% of the suggestions have exactly the right hours and the score is 85.7%; see "Results" in the [main README](../../README.md).
+
 ## What we tried that didn't work
 
 - Skipping last year's hours when past years disagree. The newest year is right more often than not, even then.

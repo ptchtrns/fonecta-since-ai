@@ -31,6 +31,20 @@ With `YEXT_API_URL` and `YEXT_API_KEY` set to the team's Yext sandbox, the sandb
 - **Owner decides (no login):** the message asks a yes-or-no question that its buttons answer ("Yes, we're closed", "No, we're open", "Keep as it is"), and links to a page that needs no login with the same three answers: confirm, edit or dismiss. The token in the link only answers that one suggestion. The dashboard offers the same three answers. Every answer makes the worker predict the business again within seconds: declined hours are never suggested again for that holiday, and approved or edited hours count as the owner's own word, so they change how likely the other days are too.
 - **Apply + confirm:** an approved change is written to Yext. Yext replaces the whole hours object, so the app reads the hours Yext has now and changes only the approved date. The owner is told which sites show it and how soon: for the sandbox's businesses the sites come from Yext's Listings API. If Yext rejects it nothing is recorded, so the suggestion stays open. Without a Yext connection the decision is saved and the UI says it isn't live yet. Standing permission applies public holidays without asking when the predictor is at least 70% sure and no linked page disagrees.
 
+## Results
+
+Measured with `uv run apps/predictor/train.py --check`: each dev business is decided by a model trained without it, as the organisers' hidden test businesses will be, and scored with the organisers' scorer. Their baseline scores 54.5%.
+
+| 2026 season, 802 dev businesses | Days | Score | Suggestions with exactly the right hours | Right about open or closed | Lookups that would have hit a closed door, prevented |
+| --- | --- | --- | --- | --- | --- |
+| All days | 11,100 | 68.3% | 86% | 91% | 87.5% |
+| The owner had entered that holiday before | 4,484 | 85.7% | 88% | 94% | 96.0% |
+| The owner never had | 6,616 | 30.1% | 77% | 80% | 67.1% |
+
+The 2025 back-test, as if it were 6 Nov 2025, splits the same way: 65.2% overall, 87.1% where the owner had entered the holiday before and 36.6% where they never had.
+
+Where the owner has told us before, the suggestions are nearly always right. Without that, there is less to go on and most owners keep their normal hours, so the predictor speaks up less: it suggests something on 880 of those 6,616 days. Every answer an owner gives adds to their history, which is why the app re-predicts the business right after each one.
+
 ## Data sources that mattered most (3–5)
 
 | Signal | How we used it | Where Connect would get it in production |
