@@ -29,6 +29,7 @@ const channelLabels: Record<string, string> = {
   whatsapp: 'on WhatsApp',
   telegram: 'on Telegram',
   standing: 'automatically',
+  copilot: 'with the copilot',
 };
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

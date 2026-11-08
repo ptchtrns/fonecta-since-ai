@@ -20,3 +20,9 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+
+# Router fix (still unfixed in next.44): a preloaded query entry is never promoted, so every read during the
+# navigation bumps its version. The dashboard layout and page both read `workspace`, re-ran each other forever and
+# froze the tab when arriving from the landing page's "Open Connecta AI". Drop the patch once upstream fixes it.
+patchedDependencies:
+  '@solidjs/router@2.0.0-next.43': patches/@solidjs__router@2.0.0-next.43.patch

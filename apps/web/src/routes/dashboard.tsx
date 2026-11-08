@@ -3,6 +3,8 @@ import { createMemo, For, Show, type ParentProps } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import { ChooseBusiness } from '~/components/connect/ChooseBusiness';
 import { ConnectLogo } from '~/components/connect/ConnectLogo';
+import { CopilotPanel } from '~/components/copilot/CopilotPanel';
+import { CopilotProvider } from '~/components/copilot/CopilotProvider';
 import {
   ChartIcon,
   ChevronsIcon,
@@ -94,7 +96,13 @@ export default function DashboardLayout(props: ParentProps) {
 
   return (
     <div class="drawer lg:drawer-open">
-      <input id={DRAWER_ID} ref={initToggle} type="checkbox" class="drawer-toggle" onChange={rememberState} />
+      <input
+        id={DRAWER_ID}
+        ref={initToggle}
+        type="checkbox"
+        class="drawer-toggle"
+        onChange={rememberState}
+      />
       <div class="drawer-content flex min-h-screen flex-col">
         <header class="navbar sticky top-0 z-10 border-b border-base-300 bg-base-100/80 px-4 backdrop-blur lg:hidden">
           <label for={DRAWER_ID} class="btn btn-square btn-ghost" aria-label="Open menu">
@@ -113,7 +121,10 @@ export default function DashboardLayout(props: ParentProps) {
               </div>
             }
           >
-            {props.children}
+            <CopilotProvider>
+              {props.children}
+              <CopilotPanel />
+            </CopilotProvider>
           </Show>
         </main>
       </div>
