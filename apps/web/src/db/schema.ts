@@ -345,7 +345,7 @@ export const entity = sqliteTable(
 );
 
 // The owner's contact preferences: from the dataset, or created when an account takes on a business without one.
-// The owner changes them on the Integrations page: opt-out, preferred channel, language and standing permission.
+// The owner changes them on the Connections page: opt-out, preferred channel, language and standing permission.
 export const customerContact = sqliteTable('customer_contact', {
   entityId: text('entity_id')
     .primaryKey()

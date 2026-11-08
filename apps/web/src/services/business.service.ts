@@ -238,7 +238,7 @@ async function readBusiness(entityId: string) {
       chatId: row.profile?.telegramChatId ?? null,
       name: row.profile?.telegramName ?? null,
     },
-    // How the owner wants to be reached, from the customer record, which the owner edits on the Integrations page.
+    // How the owner wants to be reached, from the customer record, which the owner edits on the Connections page.
     // `language` and `standingPermission` apply on every channel.
     contact: {
       optedOut: row.contact?.optedOut ?? false,

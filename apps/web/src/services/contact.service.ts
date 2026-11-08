@@ -99,7 +99,7 @@ export async function buildMessage(business: Business, item: SuggestionItem, ori
   return { state, url, ...compose(business, item, url, state.token, business.contact.language) };
 }
 
-/** The next message in every language, so the Integrations page can show it in the one the owner is picking. */
+/** The next message in every language, so the Connections page can show it in the one the owner is picking. */
 export async function previewMessage(business: Business, item: SuggestionItem, origin: string) {
   const state = await ensureState(business.id, item);
   const url = suggestionUrl(origin, state.token);

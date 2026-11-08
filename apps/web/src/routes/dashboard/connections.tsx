@@ -3,8 +3,8 @@ import { useBeforeLeave, type RouteDefinition } from '@solidjs/router';
 import { createMemo, onSettled } from 'solid-js';
 import { ContactPreferences } from '~/components/connect/ContactPreferences';
 import { Page, PageHeader } from '~/components/connect/Page';
-import { AddressChannel } from '~/components/integrations/AddressChannel';
-import { TelegramChannel } from '~/components/integrations/TelegramChannel';
+import { AddressChannel } from '~/components/connections/AddressChannel';
+import { TelegramChannel } from '~/components/connections/TelegramChannel';
 import { getCurrentUser } from '~/queries/session';
 import { getWorkspace, type Workspace } from '~/queries/workspace';
 import { emailSchema, whatsappSchema } from '~/schemas/business.schema';
@@ -13,7 +13,7 @@ export const route = {
   preload: () => void getWorkspace(),
 } satisfies RouteDefinition;
 
-export default function Integrations() {
+export default function Connections() {
   const workspace = createMemo(() => getWorkspace() as Promise<Workspace>);
   const user = createMemo(() => getCurrentUser());
 
@@ -39,8 +39,8 @@ export default function Integrations() {
 
   return (
     <Page class="max-w-3xl">
-      <Title>Integrations · Connecta AI</Title>
-      <PageHeader title="Integrations" />
+      <Title>Connections · Connecta AI</Title>
+      <PageHeader title="Connections" />
 
       <ContactPreferences workspace={workspace()} register={register} />
 

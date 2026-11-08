@@ -6,7 +6,7 @@ import { CompactChecklist } from '~/components/connect/Checklist';
 import { GoogleEdits } from '~/components/connect/GoogleEdits';
 import { ArrowRightIcon } from '~/components/connect/icons';
 import { Card, eyebrow, Meter, StatCard } from '~/components/connect/Metrics';
-import { Page, PageHeader, Panel } from '~/components/connect/Page';
+import { Page, Panel } from '~/components/connect/Page';
 import { BrandMark, LogoStrip } from '~/components/connect/PublisherLogo';
 import { SuggestionCard } from '~/components/connect/SuggestionCard';
 import { formatDay, formatHours } from '~/lib/hours';
@@ -48,20 +48,6 @@ export default function FrontPage() {
   return (
     <Page>
       <Title>{`${workspace().business.name} · Connecta AI`}</Title>
-      <PageHeader
-        title={workspace().business.name}
-        subtitle={[
-          workspace().business.category,
-          `${workspace().business.addressLine1}, ${workspace().business.city}`,
-        ]
-          .filter(Boolean)
-          .join(' · ')}
-        actions={
-          <a href="/dashboard/company" class="btn btn-sm btn-ghost border-base-300">
-            Company information
-          </a>
-        }
-      />
       <AssistantPrompt workspace={workspace()} />
 
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -223,7 +209,7 @@ function ConnectionsCard(props: { workspace: Workspace }) {
       label="Connections"
       aside={
         <a
-          href="/dashboard/integrations"
+          href="/dashboard/connections"
           class="flex items-center gap-1 font-medium text-base-content hover:underline"
         >
           Manage <ArrowRightIcon />
@@ -242,7 +228,7 @@ function ConnectionsCard(props: { workspace: Workspace }) {
               <Show
                 when={c.on}
                 fallback={
-                  <a href="/dashboard/integrations" class="btn btn-xs btn-ghost border-base-300">
+                  <a href="/dashboard/connections" class="btn btn-xs btn-ghost border-base-300">
                     Set up
                   </a>
                 }

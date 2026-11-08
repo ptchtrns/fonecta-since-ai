@@ -40,7 +40,7 @@ export async function getWorkspace(entityId: string, origin: string) {
     db.select().from(outbox).where(eq(outbox.entityId, entityId)).orderBy(desc(outbox.createdAt)).limit(5),
   ]);
 
-  // The message the owner would get next, to show on the Integrations page.
+  // The message the owner would get next, to show on the Connections page.
   const next = sendable(suggestions.pending, business.whatsapp.minImportance);
   const preview = next ? await previewMessage(business, next, origin) : null;
 

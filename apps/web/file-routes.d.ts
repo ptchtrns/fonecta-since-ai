@@ -248,16 +248,16 @@ declare module "virtual:file-routes" {
       $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/company"), Extract<"route", keyof typeof import("./src/routes/dashboard/company")>>>;
     },
     {
+      path: "/dashboard/connections";
+      page: true;
+      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/connections"), Extract<"default", keyof typeof import("./src/routes/dashboard/connections")>>>;
+      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/connections"), Extract<"route", keyof typeof import("./src/routes/dashboard/connections")>>>;
+    },
+    {
       path: "/dashboard/";
       page: true;
       $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/index"), Extract<"default", keyof typeof import("./src/routes/dashboard/index")>>>;
       $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/index"), Extract<"route", keyof typeof import("./src/routes/dashboard/index")>>>;
-    },
-    {
-      path: "/dashboard/integrations";
-      page: true;
-      $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"default", keyof typeof import("./src/routes/dashboard/integrations")>>>;
-      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"route", keyof typeof import("./src/routes/dashboard/integrations")>>>;
     },
     {
       path: "/dashboard/reports";
@@ -374,11 +374,11 @@ declare module "virtual:file-routes" {
           children?: undefined;
         },
         {
-          path: "/integrations";
-          id: "/integrations";
+          path: "/connections";
+          id: "/connections";
           page: true;
-          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"default", keyof typeof import("./src/routes/dashboard/integrations")>>>;
-          $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/integrations"), Extract<"route", keyof typeof import("./src/routes/dashboard/integrations")>>>;
+          $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dashboard/connections"), Extract<"default", keyof typeof import("./src/routes/dashboard/connections")>>>;
+          $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dashboard/connections"), Extract<"route", keyof typeof import("./src/routes/dashboard/connections")>>>;
           children?: undefined;
         }
       ];

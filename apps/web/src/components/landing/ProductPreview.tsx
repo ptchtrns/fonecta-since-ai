@@ -9,7 +9,7 @@ import { BrandMark } from '~/components/connect/PublisherLogo';
 
 const nav = [
   { label: 'Front page', icon: HomeIcon, count: '3', active: true },
-  { label: 'Integrations', icon: PlugIcon },
+  { label: 'Connections', icon: PlugIcon },
 ];
 
 const live = ['Google', 'Apple Maps', 'Bing', 'Facebook', 'Tripadvisor'];

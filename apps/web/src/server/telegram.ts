@@ -5,7 +5,7 @@ import { log } from '~/server/log';
 
 // Sends owner messages through the Telegram Bot API (https://core.telegram.org/bots/api).
 //
-// A bot can only write to someone who has started a chat with it, so the owner connects from the Integrations page:
+// A bot can only write to someone who has started a chat with it, so the owner connects from the Connections page:
 // the link opens the bot with `/start <token>`, and the webhook swaps the token for the chat id. Suggestions go out
 // with inline buttons; a tap arrives at the webhook as a callback query carrying `${action}:${token}`.
 

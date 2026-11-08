@@ -54,7 +54,7 @@ type Copy = {
   connected: (business: string) => string;
   /** A Telegram start link that's no longer valid. */
   linkExpired: string;
-  /** The Integrations page's test message, on email and Telegram. */
+  /** The Connections page's test message, on email and Telegram. */
   test: (business: string) => string;
   schoolBreak: string;
   weekdays: string[];
@@ -146,7 +146,7 @@ const copy: Record<Language, Copy> = {
     standingSubject: (business) => `Vi har uppdaterat öppettiderna för ${business}`,
     answer: 'Svara',
     connected: (business) => `Klart! Vi skickar förslag om öppettiderna för ${business} hit, ett i taget.`,
-    linkExpired: 'Den här länken gäller inte längre. Öppna en ny från sidan Integrationer.',
+    linkExpired: 'Den här länken gäller inte längre. Öppna en ny från sidan Anslutningar.',
     test: (business) => `Testmeddelande: förslag för ${business} kommer hit.`,
     schoolBreak: 'Skollov',
     weekdays: ['mån', 'tis', 'ons', 'tors', 'fre', 'lör', 'sön'],
@@ -250,7 +250,7 @@ const copy: Record<Language, Copy> = {
     answer: 'Answer',
     connected: (business) =>
       `All set! Suggestions about the hours for ${business} will come here, one at a time.`,
-    linkExpired: 'This link is no longer valid. Open a new one from the Integrations page.',
+    linkExpired: 'This link is no longer valid. Open a new one from the Connections page.',
     test: (business) => `Test message: suggestions for ${business} will come here.`,
     schoolBreak: 'School break',
     weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
