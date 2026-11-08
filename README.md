@@ -15,8 +15,6 @@ python3 apps/predictor/run.py --save local    # also show the 2026 predictions o
 uv run apps/predictor/train.py --check       # retrain the decider after changing a clue (needs scikit-learn, uv installs it)
 ```
 
-**Demo video** (2:23, 1080p, captions, no sound): [docs/connect-suggests-demo.mp4](docs/connect-suggests-demo.mp4). The five steps on two businesses: Kahvila Kipinä, a dataset business with no history (what the dashboard's numbers mean, its suggestions and why, contact preferences, an answer and what the predictor learns from it), and Business Lunch House in our Yext sandbox (its WhatsApp message on a phone, the no-login page, an edit written to the real Yext API, and the sites that show it). It ends with the results on businesses the model never saw.
-
 To see the whole loop locally, start the web app (`pnpm dev`) and sign up at `/login?mode=sign-up`, choosing one of the demo businesses from the list. To publish approved hours to the dataset's Yext mock, run `python3 data/fonecta-connect-suggests-2026/mock_api/server.py` and set `YEXT_MOCK_URL` in `apps/web/.dev.vars`. The mock only accepts changes to hours and name, so edits to other business details show its error.
 
 For the suggestions to update after each answer, run the worker in a second terminal (`cd apps/worker && uv run worker`, see [apps/worker/README.md](apps/worker/README.md)). It re-runs the predictor for the business that was answered and the dashboard shows the new suggestions.
@@ -77,7 +75,7 @@ When an owner has never entered anything for a holiday, the predictor falls back
 - **Recent reviews** where customers found the doors closed on that holiday, and **Google users' suggested hours** for the same holiday last time.
 - **Seasons and snow:** summer terraces in winter, ski rentals in summer, and ski rentals when there isn't enough snow.
 
-The clues report this evidence even when it's too weak for a guess of their own, and the decider, which learned from earlier seasons how often each combination turned out right, suggests only when it expects to be right more often than wrong. Usually it stays quiet, because owners with no history mostly keep their normal hours, and a wrong "closed" costs as much as a right one earns. `FI-D0017` Kahvila Kipinä shows this: sign up with it and it gets five suggestions, for example Epiphany closed because "54% of businesses like yours were closed on this day in earlier years", and nothing on the days where the evidence is weaker. The demo video shows this from sign-up, and what one answer changes: once the owner confirms Christmas Day closed, Epiphany closed goes from 51% to 64% sure, with a new reason, "You were closed on most of the special days you have told us about".
+The clues report this evidence even when it's too weak for a guess of their own, and the decider, which learned from earlier seasons how often each combination turned out right, suggests only when it expects to be right more often than wrong. Usually it stays quiet, because owners with no history mostly keep their normal hours, and a wrong "closed" costs as much as a right one earns. `FI-D0017` Kahvila Kipinä shows this: sign up with it and it gets five suggestions, for example Epiphany closed because "54% of businesses like yours were closed on this day in earlier years", and nothing on the days where the evidence is weaker. One answer changes the other days too: once the owner confirms Christmas Day closed, Epiphany closed goes from 51% to 64% sure, with a new reason, "You were closed on most of the special days you have told us about".
 
 ## Final customer messages (as text)
 
@@ -175,10 +173,9 @@ After standing permission ("Handle public holidays without asking"):
 
 What we learned:
 
-- **Coverage:** the account has two locations, both in Tampere. Business Lunch House has weekly hours and five holiday dates already entered for Christmas to Epiphany. The Boys Club has no hours at all.
-- **Quality:** Fonecta's category id (`R21005287`) isn't one of the dataset's types. The type is guessed from the name and description, and "lunch" makes Business Lunch House a lunch restaurant. The type decides which similar businesses the predictor compares with.
-- **Listings:** 11 publishers are live: Google, Facebook, Bing, Foursquare, HERE, MapQuest, Navmii, ShowMeLocal, TomTom, Tupalo and WhereTo. Google and Facebook say `NOT_CONNECTED`, meaning the owner's own accounts aren't linked. There are no Nordic directories and no Apple Maps. The API gives no update speeds, so "shows it within…" uses the dataset's figures where it has the publisher and three days otherwise.
-- **Gaps:** no reviews, no publisher suggestions and no exception-hour history. Analytics reports answered with an internal server error. So nothing tells the predictor what this owner did before, and it relies on what similar businesses do: Business Lunch House gets one suggestion, Christmas Eve closed (84% sure), when that date has no entry yet. For the demo video we removed its Christmas Eve entry first; the owner's edit in the video put it back as it was.
+- **Coverage:** the account has two locations, both in Tampere. Business Lunch House has weekly hours and five holiday dates already entered for Christmas to Epiphany. The Boys Club has no hours at all. Listings has 11 live publishers (Google, Facebook, Bing, Foursquare, HERE, MapQuest, Navmii, ShowMeLocal, TomTom, Tupalo and WhereTo), but no Nordic directories and no Apple Maps.
+- **Quality:** Fonecta's category id (`R21005287`) isn't one of the dataset's types. The type is guessed from the name and description, and "lunch" makes Business Lunch House a lunch restaurant. The type decides which similar businesses the predictor compares with. Google and Facebook say `NOT_CONNECTED`, meaning the owner's own accounts aren't linked.
+- **Gaps:** no reviews, no publisher suggestions and no exception-hour history. Analytics reports answered with an internal server error. So nothing tells the predictor what this owner did before, and it relies on what similar businesses do: Business Lunch House gets one suggestion, Christmas Eve closed (84% sure), when that date has no entry yet. The Listings API gives no update speeds either, so "shows it within…" uses the dataset's figures where it has the publisher and three days otherwise.
 
 ## Third-party code, data and licences
 
