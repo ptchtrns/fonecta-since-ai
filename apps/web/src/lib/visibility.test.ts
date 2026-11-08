@@ -9,13 +9,18 @@ import {
   openingLine,
   pointsToGain,
   profileReport,
+  reviewTarget,
   searchReport,
   speedGroups,
   type Facts,
   type ListingSite,
 } from '~/lib/visibility';
 
-const site = (publisherId: string, seconds: number, extra: Partial<ListingSite> = {}): ListingSite => ({
+const site = (
+  publisherId: string,
+  seconds: number | null,
+  extra: Partial<ListingSite> = {},
+): ListingSite => ({
   publisherId,
   name: publisherId,
   logo: publisherId,
@@ -30,6 +35,8 @@ const site = (publisherId: string, seconds: number, extra: Partial<ListingSite> 
 const lunchHouse: Facts = {
   name: 'Business Lunch House',
   category: 'Lunch restaurant',
+  categorySet: true,
+  categoryGuessed: true,
   city: 'Tampere',
   addressLine1: 'Hämeenkatu 25',
   phone: '+358466889909',
@@ -58,6 +65,7 @@ const lunchHouse: Facts = {
     site('FOURSQUARE', 604_800),
   ],
   reviews: { count: 0, averageRating: 0 },
+  peerReviews: null,
 };
 
 describe('reports', () => {
@@ -122,6 +130,17 @@ describe('AI answers', () => {
     expect(at('2026-11-14T10:00:00Z')).toBe('Closed · Opens Wed 10:30');
   });
 
+  test('today’s holiday hours win over the weekday’s', () => {
+    // Thursday 24 Dec, 13:00 in Helsinki: open until 14:00 instead of 14:30.
+    const at = (iso: string) =>
+      openingLine(opening(lunchHouse.hours, lunchHouse.timezone, new Date(iso), lunchHouse.holidayHours));
+    expect(at('2026-12-24T11:00:00Z')).toBe('Open · Closes 14:00 · Holiday hours');
+    // Christmas Day (Fri) is closed, so the next opening skips it and the weekend.
+    expect(at('2026-12-25T09:00:00Z')).toBe('Closed · Opens Wed 10:30 · Holiday hours');
+    // Wednesday 23 Dec after closing: Thursday opens at 10:30, as its holiday hours say.
+    expect(at('2026-12-23T13:00:00Z')).toBe('Closed · Opens Thu 10:30');
+  });
+
   test('Christmas Day comes from holiday hours', () => {
     const { answers } = aiReport(lunchHouse, new Date('2026-11-11T09:00:00Z'));
     expect(answers[1]!.answer).toBe('It’s closed on Christmas Day.');
@@ -138,11 +157,57 @@ describe('listings', () => {
       live: 4,
       total: 5,
       needsAccount: 2,
+      notLive: 1,
       slowestSeconds: 604_800,
+      unknownSpeed: 0,
     });
     expect(speedGroups(listings).map((g) => g.sites.length)).toEqual([2, 1, 1]);
     expect(formatDuration(604_800)).toBe('7 days');
     expect(formatDuration(7200)).toBe('2 hours');
+  });
+
+  test('sites without a known speed are counted apart, not guessed', () => {
+    const listings = [...lunchHouse.listings, site('HERE', null), site('TOMTOM', null)];
+    const summary = listingsSummary(listings);
+    expect(summary.slowestSeconds).toBe(604_800);
+    expect(summary.unknownSpeed).toBe(2);
+    expect(speedGroups(listings).map((g) => [g.label, g.sites.length])).toEqual([
+      ['Within an hour', 2],
+      ['Within a day', 1],
+      ['Within a few days', 1],
+      ['Speed not known', 2],
+    ]);
+  });
+
+  test('no account count when the listings don’t report it', () => {
+    const listings = [site('GOOGLEMYBUSINESS', 120, { needsAccount: null })];
+    expect(listingsSummary(listings).needsAccount).toBeNull();
+    const google = searchReport({ ...lunchHouse, listings }).checks.find((c) => c.key === 'google');
+    expect(google).toMatchObject({ label: 'Live on Google', done: true });
+  });
+});
+
+describe('review target', () => {
+  test('similar businesses set it, with a floor', () => {
+    expect(reviewTarget(null)).toBe(10);
+    expect(reviewTarget({ count: 24, averageRating: 4.2, businesses: 49 })).toBe(24);
+    expect(reviewTarget({ count: 1, averageRating: 4.2, businesses: 49 })).toBe(3);
+  });
+
+  test('an accounting office with five 4.6 ★ reviews has enough when peers have four', () => {
+    const facts: Facts = {
+      ...lunchHouse,
+      reviews: { count: 5, averageRating: 4.6 },
+      peerReviews: { count: 4, averageRating: 4.3, businesses: 53 },
+    };
+    expect(searchReport(facts).checks.find((c) => c.key === 'reviews')?.done).toBe(true);
+  });
+
+  test('a missing category fails the check', () => {
+    const check = searchReport({ ...lunchHouse, categorySet: false }).checks.find(
+      (c) => c.key === 'category',
+    );
+    expect(check?.done).toBe(false);
   });
 });
 

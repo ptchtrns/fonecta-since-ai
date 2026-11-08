@@ -92,3 +92,6 @@ export const contactSchema = z
     message: 'Nothing to save',
   });
 export type ContactPayload = z.infer<typeof contactSchema>;
+
+export const editIdSchema = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/) });
+export const answerEditSchema = z.object({ accept: z.boolean() });

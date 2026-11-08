@@ -48,23 +48,47 @@ export function ListingsTab(props: { name: string; listings: ListingSite[] }) {
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
           <StatCard
             label="Everywhere within"
-            value={summary().live ? formatDuration(summary().slowestSeconds) : '—'}
-            text="The slowest site to pick up a change"
-          />
-          <StatCard
-            label="Accounts to link"
-            value={summary().needsAccount}
+            value={summary().live > summary().unknownSpeed ? formatDuration(summary().slowestSeconds) : '—'}
             text={
-              summary().needsAccount
-                ? 'Listed, but you can’t reply to reviews there'
-                : 'Every site you are on is linked to your own account'
+              summary().unknownSpeed
+                ? `The slowest site with a known speed. ${summary().unknownSpeed} ${summary().unknownSpeed === 1 ? 'site doesn’t' : 'sites don’t'} report one.`
+                : 'The slowest site to pick up a change'
             }
           />
+          <Show
+            when={summary().needsAccount !== null}
+            fallback={
+              <StatCard
+                label="Not live yet"
+                value={summary().notLive}
+                text={
+                  summary().notLive
+                    ? 'Waiting for the site, or opted out'
+                    : 'Live on every site you are listed on'
+                }
+              />
+            }
+          >
+            <StatCard
+              label="Accounts to link"
+              value={summary().needsAccount!}
+              text={
+                summary().needsAccount
+                  ? 'Listed, but you can’t reply to reviews there'
+                  : 'Every site you are on is linked to your own account'
+              }
+            />
+          </Show>
         </div>
       </div>
 
-      <Card label="When a change goes live" aside="From each site’s typical update speed">
-        <ol class="grid gap-3 md:grid-cols-3">
+      <Card
+        label="When a change goes live"
+        aside="Each site’s typical update speed, from Connect’s listings data"
+      >
+        <ol
+          class={['grid gap-3', speedGroups(props.listings).length > 3 ? 'md:grid-cols-4' : 'md:grid-cols-3']}
+        >
           <For each={speedGroups(props.listings)}>
             {(group, i) => (
               <li class="flex flex-col gap-3 rounded-box border border-base-300 p-4">

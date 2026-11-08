@@ -673,6 +673,28 @@ export const businessSource = sqliteTable(
   (t) => [primaryKey({ columns: [t.entityId, t.url] })],
 );
 
+export const editAnswers = ['ACCEPTED', 'REJECTED'] as const;
+export type EditAnswer = (typeof editAnswers)[number];
+
+// The owner's answers to edits Google users and other sites suggested (`publisher_suggestion`, or Yext's Publisher
+// Suggestions for the account's businesses). Kept here, so the dataset's table stays as it was loaded. An accepted
+// change to the hours is applied on top of the business's own, like an approved suggestion.
+export const publisherSuggestionAnswer = sqliteTable(
+  'publisher_suggestion_answer',
+  {
+    entityId: text('entity_id').notNull(),
+    suggestionId: text('suggestion_id').notNull(),
+    status: text('status', { enum: editAnswers }).notNull(),
+    fieldName: text('field_name').notNull(),
+    // What the site suggested, in Yext's shape: `{ holidayHours: [...] }`, weekdays, or `true` for closed.
+    suggestedContent: text('suggested_content', { mode: 'json' }).$type<unknown>().notNull(),
+    // When Yext (or the dataset's mock) took the change, null when it was only saved here.
+    publishedAt: integer('published_at', { mode: 'timestamp_ms' }),
+    ...timestamps,
+  },
+  (t) => [primaryKey({ columns: [t.entityId, t.suggestionId] })],
+);
+
 export type User = typeof user.$inferSelect;
 export type Upload = typeof upload.$inferSelect;
 export type Job = typeof job.$inferSelect;

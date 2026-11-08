@@ -135,15 +135,31 @@ An account belongs to one business, chosen with the combobox when signing up (`u
 
 | Page | What it shows |
 | ---- | ------------- |
-| Front page | The business's name, the assistant's question box, the four headline numbers, the next suggestion (all of them on request), connections, profile, listings, reviews and suggested edits |
+| Front page | The business's name, the assistant's question box, the four headline numbers, the next suggestion (all of them on request), connections, profile, listings, reviews and suggested edits to accept or reject |
 | Company information | The business card and its edit form, including the pages with the business's hours, the profile checklist and holidays without hours |
 | Visibility | Tabs for Listings (sites, update speeds, accounts to link), SEO (local search score) and AI (what assistants can answer) |
-| Reports | Profile strength, what happened to the suggestions, what Connecta AI found, how the owner answers, reviews |
+| Reports | Profile strength, Google statistics, what happened to the suggestions, what Connecta AI found, how the owner answers, reviews |
 | Integrations, Account | Under Maintenance: WhatsApp, and sign-in details and the account's business |
 
 The sidebar counts what needs the owner on each page: waiting suggestions, missing profile items, and sites not live plus missing SEO and AI items.
 
-The scores are in `src/lib/visibility.ts`, worked out from data the app already has: the business's details, its listings, reviews and suggested edits (`src/services/presence.service.ts`). For the dataset's businesses these come from the dataset's tables; for the Yext account's, from Yext's Listings, Reviews and Publisher Suggestions APIs. The assistant's box answers its four offered questions from the same data; it has no language model behind it yet.
+The scores are in `src/lib/visibility.ts`, worked out from data the app already has: the business's details, its listings, reviews and suggested edits (`src/services/presence.service.ts`). For the dataset's businesses these come from the dataset's tables; for the Yext account's, from Yext's Listings, Reviews and Publisher Suggestions APIs. The points per check are rules of thumb on what Google and assistants weigh. The review target is measured: the median review count of the same type of business in the same country (at least 5 of them with reviews), with a 4 ★ average.
+
+Where each number comes from:
+
+| On the page | Source |
+| ----------- | ------ |
+| Update speeds, "Everywhere within" | Each publisher's typical speed in the dataset's `listing` table (`src/services/sites.service.ts`). Yext doesn't return speeds, so a sandbox site the dataset doesn't have shows "Speed not known" instead of a guess |
+| Accounts to link | Yext's `additionalStatus: NOT_CONNECTED`. The dataset's listings don't report it, so its businesses show "Not live yet" instead |
+| Google preview's "Open · Closes …", "Open right now?" | Weekly hours with today's and the coming days' holiday hours on top |
+| Business category check | Whether a category is set in Yext (the sandbox's is Fonecta's own code, so the type shown is read from the name, and says so) |
+| Suggested edits | `publisher_suggestion` or Yext's Publisher Suggestions. Accept and Reject go to Yext for the account's businesses. For the dataset's, accepted hours are written like any change (to the mock when connected) and the answer is kept in `publisher_suggestion_answer`. "Closed for good" is never applied from here |
+| Published | Only changes Yext (or the mock) confirmed. Approved ones saved without a Yext connection are counted apart |
+| Site updates sent | Published changes × live sites |
+| Google statistics (Reports) | `analytics_daily` for the dataset's businesses, last 28 days to its latest day against the 28 before, and 13 weeks per day. Yext's Analytics API for the account's; its error is shown when it fails, as the sandbox's does |
+| AI tab's answers, front page's box | A language model on Featherless (`src/server/ai.ts`, `src/services/assistant.service.ts`), see below |
+
+With `FEATHERLESS_API_KEY` set, the AI tab asks a model (Kimi K2, falling back to gpt-oss-120b) the five customer questions with nothing but the published listing and the "open now" line map sites give assistants, and a box takes any question a customer might ask. That's a stand-in for ChatGPT, Gemini and Siri, which also read other sites. The front page's box answers its offered questions straight from the data, and sends anything typed to the same model as the owner's advisor, with the listing, scores, gaps, suggestions and statistics. Without a key both say so and the AI tab shows rule-based answers from the listing.
 
 Dataset tables stay as they were loaded, so clicks in the demo can't change what the predictor scores. What owners do is kept in app tables that survive a reseed or a predictor run:
 
@@ -152,6 +168,7 @@ Dataset tables stay as they were loaded, so clicks in the demo can't change what
 | `business_profile` | The owner's edits on top of `entity`, channel settings (WhatsApp, Telegram, email), which suggestions go out |
 | `suggestion_state` | One row per suggestion sent or answered: token for the link, decision, what was suggested |
 | `business_source` | Pages the owner linked, any number of them, and the hours found on them |
+| `publisher_suggestion_answer` | The owner's Accept or Reject on edits Google users and other sites suggested |
 
 One exception: the owner's contact preferences (opt-out, preferred channel, message language, standing permission for public holidays) are kept in the dataset's `customer_contact`, which the owner edits under Integrations → How we reach you. The predictor doesn't read that table, but a reseed resets these preferences to the dataset's values. A business without a record there (one from Yext) gets one when an account takes it on.
 

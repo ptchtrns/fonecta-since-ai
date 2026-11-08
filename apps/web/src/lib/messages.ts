@@ -374,7 +374,7 @@ export function suggestionButtons(suggested: string, token: string, language: La
   ];
 }
 
-type Site = { name: string; seconds: number };
+type Site = { name: string; seconds: number | null };
 
 const HOUR = 3600;
 const DAY = 24 * HOUR;
@@ -396,9 +396,10 @@ export function confirmationMessage(
   const c = copy[language];
   const done = c.done(`${localDay(date, language)} ${localHours(hours, language)}`);
   if (!sites) return `${done} ${c.savedOnly}`;
-  const now = sites.filter((s) => s.seconds <= HOUR).map((s) => s.name);
-  const later = sites.filter((s) => s.seconds > HOUR);
-  const slowest = Math.max(0, ...later.map((s) => s.seconds));
+  // A site without a known speed is listed with the later ones, and doesn't set how long "later" is.
+  const now = sites.filter((s) => s.seconds !== null && s.seconds <= HOUR).map((s) => s.name);
+  const later = sites.filter((s) => s.seconds === null || s.seconds > HOUR);
+  const slowest = Math.max(HOUR + 1, ...later.map((s) => s.seconds ?? 0));
   return [
     done,
     now.length ? c.liveNow(now.join(', ')) : '',
@@ -411,7 +412,10 @@ export function confirmationMessage(
 /** The same fact for the dashboard: "Published to 8 sites. Google (Search & Maps) shows it within 2 min." */
 export function publishedSummary(sites: Site[] | null): string {
   if (!sites?.length) return 'Saved. It goes live once publishing to Yext is connected.';
-  const first = sites[0]!;
   const count = sites.length === 1 ? '1 site' : `${sites.length} sites`;
-  return `Published to ${count}. ${first.name} shows it within ${updateTime(first.seconds)}, the slowest within ${updateTime(sites.at(-1)!.seconds)}.`;
+  const known = sites.filter((s): s is { name: string; seconds: number } => s.seconds !== null);
+  if (!known.length) return `Published to ${count}.`;
+  const first = known[0]!;
+  const unknown = sites.length - known.length;
+  return `Published to ${count}. ${first.name} shows it within ${updateTime(first.seconds)}, the slowest within ${updateTime(known.at(-1)!.seconds)}${unknown ? `; ${unknown === 1 ? '1 site doesn’t' : `${unknown} sites don’t`} report a speed` : ''}.`;
 }

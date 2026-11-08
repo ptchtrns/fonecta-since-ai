@@ -16,7 +16,9 @@ import {
   sendable,
   telegramConnectLink,
 } from '~/services/contact.service';
+import { aiEnabled, modelLabel, writingModel } from '~/server/ai';
 import { getPresence } from '~/services/presence.service';
+import { getTrafficReport } from '~/services/traffic.service';
 import { listLinkedSources } from '~/services/sources.service';
 import { listSuggestions, upcomingExceptions } from '~/services/suggestions.service';
 import { syncYextBusiness } from '~/services/yext-business.service';
@@ -29,11 +31,12 @@ export async function getWorkspace(entityId: string, origin: string) {
   const business = await getBusiness(entityId);
   if (!business) return null;
 
-  const [suggestions, exceptions, linked, presence, sent] = await Promise.all([
+  const [suggestions, exceptions, linked, presence, traffic, sent] = await Promise.all([
     listSuggestions(business),
     upcomingExceptions(business),
     listLinkedSources(entityId),
     getPresence(business),
+    getTrafficReport(business),
     db.select().from(outbox).where(eq(outbox.entityId, entityId)).orderBy(desc(outbox.createdAt)).limit(5),
   ]);
 
@@ -67,6 +70,10 @@ export async function getWorkspace(entityId: string, origin: string) {
     },
     suggestions,
     presence,
+    // Google statistics, or why there are none.
+    traffic,
+    // The language model behind the question boxes, if one is connected.
+    ai: { enabled: aiEnabled(), model: aiEnabled() ? modelLabel(writingModel()) : null },
     // What goes out on every channel, and the next message as it would look.
     messages: {
       language: business.contact.language,

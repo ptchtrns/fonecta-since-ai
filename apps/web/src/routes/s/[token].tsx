@@ -165,7 +165,7 @@ function Done(props: {
   status: string;
   hours: string | null;
   date: string;
-  sites: { name: string; seconds: number }[] | null;
+  sites: { name: string; seconds: number | null }[] | null;
 }) {
   return (
     <section class="card card-border border-base-300 bg-base-100">
@@ -196,7 +196,9 @@ function Done(props: {
                   style={{ 'animation-delay': `${i() * 80}ms` }}
                 >
                   {site.name}
-                  <span class="text-base-content/60">within {updateTime(site.seconds)}</span>
+                  <span class="text-base-content/60">
+                    {site.seconds === null ? 'speed not known' : `within ${updateTime(site.seconds)}`}
+                  </span>
                 </li>
               )}
             </For>

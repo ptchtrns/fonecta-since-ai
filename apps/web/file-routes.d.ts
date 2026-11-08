@@ -151,6 +151,19 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/api/workspace/ai-answers";
+      page: false;
+      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/ai-answers"), Extract<"GET", keyof typeof import("./src/routes/api/workspace/ai-answers")>>>;
+      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/ai-answers"), Extract<"GET", keyof typeof import("./src/routes/api/workspace/ai-answers")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/ask";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/ask"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/ask")>>>;
+      $$route?: undefined;
+    },
+    {
       path: "/api/workspace/business";
       page: false;
       $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/business"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/business")>>>;
@@ -160,6 +173,12 @@ declare module "virtual:file-routes" {
       path: "/api/workspace/contact";
       page: false;
       $PATCH: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/contact"), Extract<"PATCH", keyof typeof import("./src/routes/api/workspace/contact")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/workspace/edits/:id";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/workspace/edits/[id]"), Extract<"POST", keyof typeof import("./src/routes/api/workspace/edits/[id]")>>>;
       $$route?: undefined;
     },
     {

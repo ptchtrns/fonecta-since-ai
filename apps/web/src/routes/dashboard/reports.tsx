@@ -6,8 +6,9 @@ import { ArrowRightIcon } from '~/components/connect/icons';
 import { Card, Meter, MeterRow, ScoreCard, SegmentBar, StatCard } from '~/components/connect/Metrics';
 import { Page, PageHeader } from '~/components/connect/Page';
 import { LogoStrip } from '~/components/connect/PublisherLogo';
+import { TrafficChart } from '~/components/connect/TrafficChart';
 import { formatDay } from '~/lib/hours';
-import { suggestionStats } from '~/lib/report';
+import { siteUpdates, suggestionStats } from '~/lib/report';
 import { getWorkspace, type Workspace } from '~/queries/workspace';
 
 export const route = {
@@ -81,7 +82,11 @@ export default function Reports() {
           <StatCard
             label="Published"
             value={stats().published}
-            text={`${stats().publishedAfterEdit} edited by you first`}
+            text={
+              stats().approvedNotLive
+                ? `Confirmed by Yext. ${stats().approvedNotLive} more approved, saved here until Yext is connected`
+                : `Confirmed by Yext, ${stats().publishedAfterEdit} edited by you first`
+            }
           />
           <StatCard
             label="You said yes"
@@ -91,12 +96,14 @@ export default function Reports() {
             <Meter value={stats().yesRate ?? 0} label="Share of suggestions you said yes to" />
           </StatCard>
           <StatCard
-            label="Kept in sync"
-            value={stats().automatic}
-            text="Applied without asking, under your standing permission"
+            label="Site updates sent"
+            value={siteUpdates(stats().published, live().length)}
+            text={`${stats().published} published ${stats().published === 1 ? 'change' : 'changes'} × ${live().length} live sites. ${stats().automatic} applied without asking, under your standing permission`}
           />
         </div>
       </div>
+
+      <TrafficCard report={workspace().traffic} />
 
       <div class="grid items-start gap-4 md:grid-cols-2">
         <Card
@@ -109,7 +116,13 @@ export default function Reports() {
         >
           <MeterRow label="Suggested" count={stats().suggested} total={stats().suggested} showShare />
           <MeterRow label="Answered" count={stats().answered} total={stats().suggested} showShare />
-          <MeterRow label="Published" count={stats().published} total={stats().suggested} showShare />
+          <MeterRow
+            label="Approved"
+            count={stats().published + stats().approvedNotLive}
+            total={stats().suggested}
+            showShare
+          />
+          <MeterRow label="Published by Yext" count={stats().published} total={stats().suggested} showShare />
         </Card>
 
         <Card
@@ -170,5 +183,60 @@ export default function Reports() {
         </Card>
       </div>
     </Page>
+  );
+}
+
+const formatChange = (change: number | null) =>
+  change === null
+    ? 'No earlier period'
+    : `${change >= 0 ? '+' : '−'}${Math.abs(Math.round(change * 100))}% vs the 4 weeks before`;
+
+/** Google statistics: the last four weeks' totals and the daily views behind them. */
+function TrafficCard(props: { report: Workspace['traffic'] }) {
+  return (
+    <Show
+      when={props.report.traffic}
+      fallback={
+        <Card label="Google statistics">
+          <p class="text-sm text-base-content/60">{props.report.unavailable}</p>
+        </Card>
+      }
+    >
+      {(t) => (
+        <Card
+          label="Google statistics"
+          aside={`${formatDay(t().from)} – ${formatDay(t().to)}${t().source === 'dataset' ? ', latest in the data' : ''}`}
+        >
+          <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Tile label="Views" value={t().totals.views} text={formatChange(t().change.views)} />
+            <Tile label="Searches" value={t().totals.searches} text={formatChange(t().change.searches)} />
+            <Tile
+              label="Actions"
+              value={t().totals.actions}
+              text={`Directions, calls and website clicks. ${formatChange(t().change.actions)}`}
+            />
+            <Tile label="Calls" value={t().totals.calls} text={formatChange(t().change.calls)} />
+          </div>
+          <TrafficChart
+            points={t().daily}
+            label={`Google Search and Maps views per day, ${formatDay(t().daily[0]!.date)} to ${formatDay(t().to)}`}
+          />
+          <p class="text-xs text-base-content/50">
+            Google Search and Maps views per day, last 13 weeks. Holidays with wrong hours lose these people
+            to a closed door, which is why suggestions for busy days come first.
+          </p>
+        </Card>
+      )}
+    </Show>
+  );
+}
+
+function Tile(props: { label: string; value: number; text: string }) {
+  return (
+    <div class="flex flex-col gap-1">
+      <span class="font-mono text-xs tracking-wider text-base-content/50 uppercase">{props.label}</span>
+      <span class="text-2xl font-semibold tabular-nums">{props.value.toLocaleString('en-GB')}</span>
+      <span class="text-xs text-base-content/60">{props.text}</span>
+    </div>
   );
 }

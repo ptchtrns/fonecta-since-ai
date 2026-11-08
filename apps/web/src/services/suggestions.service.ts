@@ -274,7 +274,7 @@ export type Decision = {
   status: SuggestionStatus;
   hours: string | null;
   /** Where the change shows, or null when publishing isn't connected. */
-  sites: { name: string; seconds: number }[] | null;
+  sites: { name: string; seconds: number | null }[] | null;
 };
 
 /** The owner's answer, from any channel. Nothing is published before this runs. */
