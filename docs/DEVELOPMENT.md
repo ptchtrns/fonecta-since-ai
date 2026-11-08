@@ -141,6 +141,8 @@ An account belongs to one business, chosen with the combobox when signing up (`u
 | Reports | Profile strength, Google statistics, what happened to the suggestions, what Connecta AI found, how the owner answers, reviews |
 | Integrations, Account | Under Maintenance: WhatsApp, and sign-in details and the account's business |
 
+Every dashboard page has the **copilot** in the corner ("Ask Connecta AI"): it answers from the business's data and its guides (`src/guides/*.md`), and prepares changes the owner confirms in a preview. See [COPILOT.md](COPILOT.md).
+
 The sidebar counts what needs the owner on each page: waiting suggestions, missing profile items, and sites not live plus missing SEO and AI items.
 
 The scores are in `src/lib/visibility.ts`, worked out from data the app already has: the business's details, its listings, reviews and suggested edits (`src/services/presence.service.ts`). For the dataset's businesses these come from the dataset's tables; for the Yext account's, from Yext's Listings, Reviews and Publisher Suggestions APIs. The points per check are rules of thumb on what Google and assistants weigh. The review target is measured: the median review count of the same type of business in the same country (at least 5 of them with reviews), with a 4 ★ average.

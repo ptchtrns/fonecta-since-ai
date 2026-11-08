@@ -8,6 +8,9 @@ overrides:
   vite: npm:@voidzero-dev/vite-plus-core@1.4.0
   vitest: 5.0.5
 
+patchedDependencies:
+  '@solidjs/router@2.0.0-next.43': dc7774dc1add7ce1942a0b841022c3e8f08608531d1bf9f790ba8fd8177bd481
+
 importers:
 
   .:
@@ -23,7 +26,7 @@ importers:
         version: 1.0.0-next.2(@solidjs/web@2.0.0-rc.20(solid-js@2.0.0-rc.20))(solid-js@2.0.0-rc.20)
       '@solidjs/router':
         specifier: 2.0.0-next.43
-        version: 2.0.0-next.43(@solidjs/web@2.0.0-rc.20(solid-js@2.0.0-rc.20))(filesystem-routing@0.4.2(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(typescript@5.9.3)))(solid-js@2.0.0-rc.20)
+        version: 2.0.0-next.43(patch_hash=dc7774dc1add7ce1942a0b841022c3e8f08608531d1bf9f790ba8fd8177bd481)(@solidjs/web@2.0.0-rc.20(solid-js@2.0.0-rc.20))(filesystem-routing@0.4.2(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(typescript@5.9.3)))(solid-js@2.0.0-rc.20)
       '@solidjs/web':
         specifier: 2.0.0-rc.20
         version: 2.0.0-rc.20(solid-js@2.0.0-rc.20)
@@ -3303,7 +3306,7 @@ snapshots:
       '@solidjs/web': 2.0.0-rc.20(solid-js@2.0.0-rc.20)
       solid-js: 2.0.0-rc.20
 
-  '@solidjs/router@2.0.0-next.43(@solidjs/web@2.0.0-rc.20(solid-js@2.0.0-rc.20))(filesystem-routing@0.4.2(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(typescript@5.9.3)))(solid-js@2.0.0-rc.20)':
+  '@solidjs/router@2.0.0-next.43(patch_hash=dc7774dc1add7ce1942a0b841022c3e8f08608531d1bf9f790ba8fd8177bd481)(@solidjs/web@2.0.0-rc.20(solid-js@2.0.0-rc.20))(filesystem-routing@0.4.2(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(typescript@5.9.3)))(solid-js@2.0.0-rc.20)':
     dependencies:
       '@solidjs/web': 2.0.0-rc.20(solid-js@2.0.0-rc.20)
       solid-js: 2.0.0-rc.20

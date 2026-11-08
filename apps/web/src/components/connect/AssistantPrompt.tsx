@@ -4,11 +4,12 @@ import { formatDay, formatHours } from '~/lib/hours';
 import type { Check } from '~/lib/visibility';
 import type { Workspace } from '~/queries/workspace';
 import { SendIcon } from './icons';
+import { useCopilot } from '~/components/copilot/CopilotProvider';
 import { Card } from './Metrics';
 
 // The front page's question box. The questions it offers are answered at once from the business's own data. Anything
-// else goes to the language model (`/api/workspace/ask`), which gets the same data: the listing, the scores and what's
-// missing, the suggestions and the Google statistics. Follow-ups continue the conversation.
+// else goes to the copilot (components/copilot), which can also look things up and prepare changes for the owner to
+// confirm. Outside the dashboard's copilot, typed questions go to the language model (`/api/workspace/ask`).
 
 type Reply = {
   question: string;
@@ -113,6 +114,7 @@ function questions(w: Workspace): Question[] {
 }
 
 export function AssistantPrompt(props: { workspace: Workspace }) {
+  const copilot = useCopilot();
   const [text, setText] = createSignal('');
   const [thread, setThread] = createSignal<Reply[]>([]);
   const list = () => questions(props.workspace);
@@ -156,6 +158,10 @@ export function AssistantPrompt(props: { workspace: Workspace }) {
     const known = list().find((x) => x.text.toLowerCase() === q.toLowerCase());
     if (known) {
       setThread((t) => [...t, { ...known.answer(), model: null }]);
+      return;
+    }
+    if (copilot && props.workspace.ai.enabled) {
+      void copilot.openPanel({ ask: q });
       return;
     }
     if (!props.workspace.ai.enabled) {

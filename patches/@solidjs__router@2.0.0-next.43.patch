@@ -1,0 +1,28 @@
+diff --git a/dist/data/query.js b/dist/data/query.js
+index 5b0ff4c9414fea8d07abff5c4b1e149705da4d1a..19a8560d9d88824f29b4a1aa98ff784c45a00da4 100644
+--- a/dist/data/query.js
++++ b/dist/data/query.js
+@@ -206,7 +206,11 @@ export function query(fn, name) {
+                 cached[4][0](); // track
+             }
+             if (cached[3] === "preload" && intent !== "preload") {
++                // Promote the preloaded entry once. Left marked "preload", every later read in the same navigation
++                // stamps a new time and bumps the version, so two readers (a layout and its page) re-run each other
++                // forever whenever their reads land in different milliseconds.
+                 cached[0] = now;
++                cached[3] = intent;
+             }
+             let res = cached[1];
+             if (intent !== "preload") {
+diff --git a/dist/index.js b/dist/index.js
+index 93b727ba52f504f14fe37fbaf9cc6b0ec575f44e..bb099cf24c4ac07d098f3ca7ab0f11142f0c3eb6 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -2040,6 +2040,7 @@ function query(fn, name) {
+       }
+       if (cached[3] === "preload" && intent !== "preload") {
+         cached[0] = now;
++        cached[3] = intent;
+       }
+       let res = cached[1];
+       if (intent !== "preload") {

@@ -11,6 +11,7 @@ export const CHANNELS: { via: DecisionChannel; label: string }[] = [
   { via: 'whatsapp', label: 'WhatsApp' },
   { via: 'telegram', label: 'Telegram' },
   { via: 'dashboard', label: 'Dashboard' },
+  { via: 'copilot', label: 'Connecta AI copilot' },
   { via: 'link', label: 'Link in message' },
   { via: 'standing', label: 'Automatically' },
 ];

@@ -620,7 +620,8 @@ export const outbox = sqliteTable(
 
 export const suggestionStatuses = ['pending', 'approved', 'edited', 'declined'] as const;
 export type SuggestionStatus = (typeof suggestionStatuses)[number];
-export const decisionChannels = ['dashboard', 'link', 'whatsapp', 'telegram', 'standing'] as const;
+// `copilot`: confirmed in the dashboard's AI copilot, after its preview.
+export const decisionChannels = ['dashboard', 'link', 'whatsapp', 'telegram', 'standing', 'copilot'] as const;
 export type DecisionChannel = (typeof decisionChannels)[number];
 
 /** What was suggested and why, kept with the decision: predictor runs replace the `prediction` rows. */
@@ -693,6 +694,193 @@ export const publisherSuggestionAnswer = sqliteTable(
     ...timestamps,
   },
   (t) => [primaryKey({ columns: [t.entityId, t.suggestionId] })],
+);
+
+// AI copilot (docs/COPILOT.md). Everything is owned by a user and the business they manage (`entity_id`), and every
+// query filters on both, taken from the session. Message text is kept for the conversation's retention period
+// (COPILOT_RETENTION_DAYS); audit rows keep no prompt or message text and stay longer.
+
+export const copilotConversationStatuses = ['open', 'archived'] as const;
+export const copilotMessageRoles = ['user', 'assistant', 'event'] as const;
+export type CopilotMessageRole = (typeof copilotMessageRoles)[number];
+// pending: the model is working on it. cancelled: the owner pressed Stop. failed: the model or a tool failed.
+export const copilotMessageStatuses = ['pending', 'complete', 'cancelled', 'failed'] as const;
+export type CopilotMessageStatus = (typeof copilotMessageStatuses)[number];
+export const copilotToolCallStatuses = ['ok', 'rejected', 'failed'] as const;
+export type CopilotToolCallStatus = (typeof copilotToolCallStatuses)[number];
+// pending → confirmed (claimed by one confirm request) → committed | failed. A pending preview can also end as
+// cancelled (owner or Stop), expired (not confirmed in time) or stale (the data changed since it was made).
+export const copilotPreviewStatuses = [
+  'pending',
+  'confirmed',
+  'committed',
+  'failed',
+  'cancelled',
+  'expired',
+  'stale',
+] as const;
+export type CopilotPreviewStatus = (typeof copilotPreviewStatuses)[number];
+
+/** One row of an edit preview: a field as it is now and as it would be. */
+export type CopilotDiffRow = { field: string; label: string; before: string; after: string };
+
+export const copilotConversation = sqliteTable(
+  'copilot_conversation',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    entityId: text('entity_id').notNull(),
+    status: text('status', { enum: copilotConversationStatuses }).notNull().default('open'),
+    title: text('title').notNull(),
+    // Rolling summary of the messages up to `summary_through` (their `seq`), so old turns needn't be sent again.
+    summary: text('summary').notNull().default(''),
+    summaryThrough: integer('summary_through').notNull().default(0),
+    // The last `seq` used: messages are numbered within the conversation.
+    lastSeq: integer('last_seq').notNull().default(0),
+    lastMessageAt: integer('last_message_at', { mode: 'timestamp_ms' }).notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('copilot_conversation_owner_idx').on(t.userId, t.entityId, t.lastMessageAt),
+    // For the retention purge.
+    index('copilot_conversation_last_idx').on(t.lastMessageAt),
+  ],
+);
+
+export const copilotMessage = sqliteTable(
+  'copilot_message',
+  {
+    id: text('id').primaryKey(),
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => copilotConversation.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    role: text('role', { enum: copilotMessageRoles }).notNull(),
+    content: text('content').notNull(),
+    status: text('status', { enum: copilotMessageStatuses }).notNull().default('complete'),
+    // The browser's id for the owner's message: sending it twice returns the first answer.
+    clientMessageId: text('client_message_id'),
+    // The page the owner was on, e.g. "/dashboard/company". Never a full URL.
+    route: text('route'),
+    // Model and provider metadata of an assistant message. No prompt text.
+    provider: text('provider'),
+    model: text('model'),
+    promptTokens: integer('prompt_tokens'),
+    completionTokens: integer('completion_tokens'),
+    latencyMs: integer('latency_ms'),
+    contextVersion: text('context_version'),
+    // Hash of the business data the answer was based on, to tell later whether it was stale.
+    contextHash: text('context_hash'),
+    errorCode: text('error_code'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('copilot_message_seq_idx').on(t.conversationId, t.seq),
+    uniqueIndex('copilot_message_client_idx').on(t.conversationId, t.clientMessageId),
+  ],
+);
+
+export const copilotToolCall = sqliteTable(
+  'copilot_tool_call',
+  {
+    id: text('id').primaryKey(),
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => copilotConversation.id, { onDelete: 'cascade' }),
+    // The assistant message the call was made for.
+    messageId: text('message_id').notNull(),
+    tool: text('tool').notNull(),
+    // The validated arguments, or for a rejected call the reason only: the model's raw output isn't kept.
+    arguments: text('arguments', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+    status: text('status', { enum: copilotToolCallStatuses }).notNull(),
+    // A short description of what came back, e.g. "3 suggestions" or a preview id, not the data itself.
+    resultSummary: text('result_summary').notNull().default(''),
+    errorCode: text('error_code'),
+    durationMs: integer('duration_ms').notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [index('copilot_tool_call_message_idx').on(t.messageId)],
+);
+
+export const copilotPreview = sqliteTable(
+  'copilot_preview',
+  {
+    id: text('id').primaryKey(),
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => copilotConversation.id, { onDelete: 'cascade' }),
+    messageId: text('message_id').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    entityId: text('entity_id').notNull(),
+    // The proposal tool, e.g. "propose_business_details". Decides which domain service commits it.
+    operation: text('operation').notNull(),
+    // The operation's input, validated against its schema when the preview was made and again on commit.
+    payload: text('payload', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+    diff: text('diff', { mode: 'json' }).$type<CopilotDiffRow[]>().notNull(),
+    // Side effects the owner should know before confirming, e.g. "Published to Google and 10 other sites".
+    effects: text('effects', { mode: 'json' }).$type<string[]>().notNull(),
+    // Hash of the current values of the fields the change touches. Confirming checks it again.
+    baseHash: text('base_hash').notNull(),
+    status: text('status', { enum: copilotPreviewStatuses }).notNull().default('pending'),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    // Sent by the browser with the confirmation. The same key again returns the same outcome.
+    idempotencyKey: text('idempotency_key'),
+    confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }),
+    committedAt: integer('committed_at', { mode: 'timestamp_ms' }),
+    // What the owner was told: "Saved and published." and where it shows.
+    resultMessage: text('result_message'),
+    errorCode: text('error_code'),
+    ...timestamps,
+  },
+  (t) => [
+    index('copilot_preview_conversation_idx').on(t.conversationId),
+    index('copilot_preview_entity_status_idx').on(t.entityId, t.status),
+    uniqueIndex('copilot_preview_idempotency_idx').on(t.idempotencyKey),
+  ],
+);
+
+export const copilotAuditEvents = [
+  'message_received',
+  'answer_sent',
+  'answer_failed',
+  'answer_cancelled',
+  'tool_called',
+  'tool_rejected',
+  'preview_created',
+  'preview_confirmed',
+  'preview_committed',
+  'preview_failed',
+  'preview_cancelled',
+  'preview_stale',
+  'preview_expired',
+  'rate_limited',
+  'untrusted_content',
+  'conversation_deleted',
+] as const;
+export type CopilotAuditEvent = (typeof copilotAuditEvents)[number];
+
+// Append-only. No foreign keys, so deleting a conversation or an account keeps who did what to a business.
+export const copilotAudit = sqliteTable(
+  'copilot_audit',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    entityId: text('entity_id').notNull(),
+    conversationId: text('conversation_id'),
+    previewId: text('preview_id'),
+    event: text('event', { enum: copilotAuditEvents }).notNull(),
+    // Ids, codes, counts and field names only: never message text, prompts or field values.
+    detail: text('detail', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('copilot_audit_entity_idx').on(t.entityId, t.createdAt),
+    index('copilot_audit_user_idx').on(t.userId, t.createdAt),
+  ],
 );
 
 export type User = typeof user.$inferSelect;

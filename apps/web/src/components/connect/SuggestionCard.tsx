@@ -6,6 +6,7 @@ import { createFormState } from '~/lib/form';
 import { formatDay, formatHours } from '~/lib/hours';
 import { answerLabels, expectedLookups, impactRest, suggestionHeadline } from '~/lib/suggestion-copy';
 import { getWorkspace, type SuggestionItem } from '~/queries/workspace';
+import { useCopilot } from '~/components/copilot/CopilotProvider';
 import { HoursInput } from './HoursInput';
 
 const importanceStyle = { high: 'badge-neutral', medium: 'badge-outline', low: 'badge-ghost' } as const;
@@ -20,6 +21,7 @@ export const sourceNames: Record<string, string> = {
 /** One suggested change: a question, what's at stake for customers, and one tap to answer. The why is folded away. */
 export function SuggestionCard(props: { suggestion: SuggestionItem; onAnswered: (message: string) => void }) {
   const s = () => props.suggestion;
+  const copilot = useCopilot();
   const form = createFormState();
   const [edit, setEdit] = createSignal<string | null>(null);
   const closure = () => s().kind === 'closure';
@@ -192,6 +194,22 @@ export function SuggestionCard(props: { suggestion: SuggestionItem; onAnswered: 
             <ul class="mt-2 flex list-disc flex-col gap-0.5 pl-5">
               <For each={s().reasons}>{(reason) => <li>{reason}</li>}</For>
             </ul>
+            <Show when={copilot}>
+              {(c) => (
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs mt-2 px-0 text-base-content/60"
+                  onClick={() =>
+                    void c().openPanel({
+                      selection: { type: 'suggestion', key: s().key },
+                      ask: 'Explain this suggestion: why, how sure, and what happens if I answer.',
+                    })
+                  }
+                >
+                  Ask Connecta AI about this
+                </button>
+              )}
+            </Show>
             <Show when={!closure()}>
               <p class="mt-2 text-xs text-base-content/50">
                 {Math.round((s().confidence ?? 0) * 100)}% sure · {s().views} Google views on a day like this

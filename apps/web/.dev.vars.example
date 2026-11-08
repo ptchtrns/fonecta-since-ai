@@ -30,10 +30,12 @@ WORKER_TOKEN=local-worker-token
 # TELEGRAM_BOT_TOKEN=
 # TELEGRAM_BOT_USERNAME=
 # TELEGRAM_WEBHOOK_SECRET=
-# Open models on Featherless (OpenAI-compatible): the front page's question box, and the AI tab's answers and
-# "ask like a customer". Without a key both say no model is connected and fall back to answers from the data.
+# Open models on Featherless (OpenAI-compatible): the dashboard's copilot, the front page's question box, and the AI
+# tab's answers and "ask like a customer". Without a key both say no model is connected and fall back to answers from the data.
 # FEATHERLESS_API_KEY=
 # FEATHERLESS_BASE_URL=https://api.featherless.ai/v1
 # Optional model overrides: the writing model is tried first, the other if it fails.
 # AI_MODEL_WRITE=moonshotai/Kimi-K2-Instruct-0905
 # AI_MODEL_REASON=openai/gpt-oss-120b
+# The dashboard's copilot (docs/COPILOT.md) tries this first, then the writing model. Defaults to the reasoning model.
+# AI_MODEL_COPILOT=openai/gpt-oss-120b

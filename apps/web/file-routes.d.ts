@@ -56,6 +56,45 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/api/copilot";
+      page: false;
+      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot"), Extract<"GET", keyof typeof import("./src/routes/api/copilot")>>>;
+      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot"), Extract<"GET", keyof typeof import("./src/routes/api/copilot")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/copilot/conversations/:id";
+      page: false;
+      $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot/conversations/[id]"), Extract<"GET", keyof typeof import("./src/routes/api/copilot/conversations/[id]")>>>;
+      $DELETE: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot/conversations/[id]"), Extract<"DELETE", keyof typeof import("./src/routes/api/copilot/conversations/[id]")>>>;
+      $HEAD: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot/conversations/[id]"), Extract<"GET", keyof typeof import("./src/routes/api/copilot/conversations/[id]")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/copilot/conversations/:id/cancel";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot/conversations/[id]/cancel"), Extract<"POST", keyof typeof import("./src/routes/api/copilot/conversations/[id]/cancel")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/copilot/messages";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot/messages"), Extract<"POST", keyof typeof import("./src/routes/api/copilot/messages")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/copilot/previews/:id/cancel";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot/previews/[id]/cancel"), Extract<"POST", keyof typeof import("./src/routes/api/copilot/previews/[id]/cancel")>>>;
+      $$route?: undefined;
+    },
+    {
+      path: "/api/copilot/previews/:id/confirm";
+      page: false;
+      $POST: FileRouteLazyRef<Pick<typeof import("./src/routes/api/copilot/previews/[id]/confirm"), Extract<"POST", keyof typeof import("./src/routes/api/copilot/previews/[id]/confirm")>>>;
+      $$route?: undefined;
+    },
+    {
       path: "/api/files/*key";
       page: false;
       $GET: FileRouteLazyRef<Pick<typeof import("./src/routes/api/files/[...key]"), Extract<"GET", keyof typeof import("./src/routes/api/files/[...key]")>>>;
