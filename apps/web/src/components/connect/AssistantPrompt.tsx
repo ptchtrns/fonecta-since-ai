@@ -7,9 +7,9 @@ import { SendIcon } from './icons';
 import { useCopilot } from '~/components/copilot/CopilotProvider';
 import { Card } from './Metrics';
 
-// The front page's question box. The questions it offers are answered at once from the business's own data. Anything
-// else goes to the copilot (components/copilot), which can also look things up and prepare changes for the owner to
-// confirm. Outside the dashboard's copilot, typed questions go to the language model (`/api/workspace/ask`).
+// The front page's question box. Typed questions and the suggested ones below both go to the copilot
+// (components/copilot), which can look things up and prepare changes for the owner to confirm. Without a model,
+// the suggested questions are answered from the business's own data.
 
 type Reply = {
   question: string;
@@ -155,13 +155,14 @@ export function AssistantPrompt(props: { workspace: Workspace }) {
     const q = question.trim();
     if (!q || busy()) return;
     setText('');
+    // Typed or picked from the chips below, a question goes to the copilot chat when there is one.
+    if (copilot && props.workspace.ai.enabled) {
+      void copilot.openPanel({ ask: q });
+      return;
+    }
     const known = list().find((x) => x.text.toLowerCase() === q.toLowerCase());
     if (known) {
       setThread((t) => [...t, { ...known.answer(), model: null }]);
-      return;
-    }
-    if (copilot && props.workspace.ai.enabled) {
-      void copilot.openPanel({ ask: q });
       return;
     }
     if (!props.workspace.ai.enabled) {
