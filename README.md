@@ -15,6 +15,8 @@ python3 apps/predictor/run.py --save local    # also show the 2026 predictions o
 uv run apps/predictor/train.py --check       # retrain the decider after changing a clue (needs scikit-learn, uv installs it)
 ```
 
+**Demo video** (2:38, 1080p, captions, no sound): [docs/connect-suggests-demo.mp4](docs/connect-suggests-demo.mp4). The five steps on two businesses: Kahvila Kipinä, a dataset business with no history (what the dashboard's numbers mean, its suggestions and why, contact preferences, an answer and what the predictor learns from it, and a change asked of the Connecta AI copilot in Finnish, which only takes effect when the owner confirms), and Business Lunch House in our Yext sandbox (its WhatsApp message on a phone, the no-login page, an edit written to the real Yext API, and the sites that show it). It ends with the results on businesses the model never saw.
+
 To see the whole loop locally, start the web app (`pnpm dev`) and sign up at `/login?mode=sign-up`, choosing one of the demo businesses from the list. To publish approved hours to the dataset's Yext mock, run `python3 data/fonecta-connect-suggests-2026/mock_api/server.py` and set `YEXT_MOCK_URL` in `apps/web/.dev.vars`. The mock only accepts changes to hours and name, so edits to other business details show its error.
 
 For the suggestions to update after each answer, run the worker in a second terminal (`cd apps/worker && uv run worker`, see [apps/worker/README.md](apps/worker/README.md)). It re-runs the predictor for the business that was answered and the dashboard shows the new suggestions.
@@ -28,6 +30,18 @@ With `YEXT_API_URL` and `YEXT_API_KEY` set to the team's Yext sandbox, the sandb
 - **Contact:** one suggestion at a time, most important first, in the owner's language. It goes to every channel the owner turned on under Integrations: WhatsApp, Telegram (the owner connects the bot with one tap and answers with its buttons) and email through Resend (with a link to the no-login answer page). Until they turn one on, it goes to the preferred channel in their customer record; text messages, app notifications and email to the record's address are recorded in an outbox and shown on the Integrations page, as those aren't connected in the demo. An answer on any channel, the link or the dashboard moves the conversation on. An owner who opted out gets no messages and can turn them back on there. Messages wait for the owner's contact hours (e.g. 12-16, in the business's time zone); the scheduled run is hourly for that. A suggestion that a linked page disagrees with is never sent. The `RESEND_*` and `TELEGRAM_*` settings are in `apps/web/.dev.vars.example`.
 - **Owner decides (no login):** the message asks a yes-or-no question that its buttons answer ("Yes, we're closed", "No, we're open", "Keep as it is"), and links to a page that needs no login with the same three answers: confirm, edit or dismiss. The token in the link only answers that one suggestion. The dashboard offers the same three answers. Every answer makes the worker predict the business again within seconds: declined hours are never suggested again for that holiday, and approved or edited hours count as the owner's own word, so they change how likely the other days are too.
 - **Apply + confirm:** an approved change is written to Yext. Yext replaces the whole hours object, so the app reads the hours Yext has now and changes only the approved date. The owner is told which sites show it and how soon: for the sandbox's businesses the sites come from Yext's Listings API. If Yext rejects it nothing is recorded, so the suggestion stays open. Without a Yext connection the decision is saved and the UI says it isn't live yet. Standing permission applies public holidays without asking when the predictor is at least 70% sure and no linked page disagrees.
+
+## How the predictor decides: gradient-boosted trees
+
+The clues only propose hours. Whether to suggest anything is decided by gradient-boosted decision trees (scikit-learn), trained on what really happened:
+
+- **Trained the way it is used.** Past seasons (winters 2024 and 2025, and three springs) are replayed from their own snapshot dates with only what was known then, plus the 2025 pilot's owner answers. Every option a clue could have proposed is scored the way the organisers' scorer would score it.
+- **It learns how far to trust each clue.** 79 numbers describe an option: the day, the evidence, which clues back it, and how it differs from what Google shows. Nobody sets by hand that last year's hours count for more from an owner who updates them every year than from one who skipped two years; the trees learn it.
+- **It knows when to stay quiet.** Three models of 300 trees predict the points an option would earn, and the best one is suggested only when that is above zero, that is, when it expects to be right more often than wrong. The same number is the "64% sure" the owner sees.
+- **Measured on businesses it never saw.** It beat our hand-weighted rules by 0.9% in 2026 and by 1.7% in the 2025 back-test. On the days owners never told us about, it scored 36.7% against 17.7% for a language model deciding on its own.
+- **Cheap to run.** Training takes about two minutes on a laptop. Deciding the whole season takes about 20 seconds with only the Python standard library and no internet, because the trees are written out as plain Python.
+
+Details: [apps/predictor/TECHNICAL.md](apps/predictor/TECHNICAL.md).
 
 ## Results
 
@@ -75,7 +89,7 @@ When an owner has never entered anything for a holiday, the predictor falls back
 - **Recent reviews** where customers found the doors closed on that holiday, and **Google users' suggested hours** for the same holiday last time.
 - **Seasons and snow:** summer terraces in winter, ski rentals in summer, and ski rentals when there isn't enough snow.
 
-The clues report this evidence even when it's too weak for a guess of their own, and the decider, which learned from earlier seasons how often each combination turned out right, suggests only when it expects to be right more often than wrong. Usually it stays quiet, because owners with no history mostly keep their normal hours, and a wrong "closed" costs as much as a right one earns. `FI-D0017` Kahvila Kipinä shows this: sign up with it and it gets five suggestions, for example Epiphany closed because "54% of businesses like yours were closed on this day in earlier years", and nothing on the days where the evidence is weaker. One answer changes the other days too: once the owner confirms Christmas Day closed, Epiphany closed goes from 51% to 64% sure, with a new reason, "You were closed on most of the special days you have told us about".
+The clues report this evidence even when it's too weak for a guess of their own, and the decider, which learned from earlier seasons how often each combination turned out right, suggests only when it expects to be right more often than wrong. Usually it stays quiet, because owners with no history mostly keep their normal hours, and a wrong "closed" costs as much as a right one earns. `FI-D0017` Kahvila Kipinä shows this: sign up with it and it gets five suggestions, for example Epiphany closed because "54% of businesses like yours were closed on this day in earlier years", and nothing on the days where the evidence is weaker. The demo video shows this from sign-up, and what one answer changes: once the owner confirms Christmas Day closed, Epiphany closed goes from 51% to 64% sure, with a new reason, "You were closed on most of the special days you have told us about".
 
 ## Final customer messages (as text)
 
@@ -176,6 +190,8 @@ What we learned:
 - **Coverage:** the account has two locations, both in Tampere. Business Lunch House has weekly hours and five holiday dates already entered for Christmas to Epiphany. The Boys Club has no hours at all. Listings has 11 live publishers (Google, Facebook, Bing, Foursquare, HERE, MapQuest, Navmii, ShowMeLocal, TomTom, Tupalo and WhereTo), but no Nordic directories and no Apple Maps.
 - **Quality:** Fonecta's category id (`R21005287`) isn't one of the dataset's types. The type is guessed from the name and description, and "lunch" makes Business Lunch House a lunch restaurant. The type decides which similar businesses the predictor compares with. Google and Facebook say `NOT_CONNECTED`, meaning the owner's own accounts aren't linked.
 - **Gaps:** no reviews, no publisher suggestions and no exception-hour history. Analytics reports answered with an internal server error. So nothing tells the predictor what this owner did before, and it relies on what similar businesses do: Business Lunch House gets one suggestion, Christmas Eve closed (84% sure), when that date has no entry yet. The Listings API gives no update speeds either, so "shows it within…" uses the dataset's figures where it has the publisher and three days otherwise.
+
+For the demo video we removed Business Lunch House's Christmas Eve entry first, so it had a suggestion; the owner's edit in the video put it back as it was.
 
 ## Third-party code, data and licences
 
