@@ -46,3 +46,6 @@ predictions_2025_backtest.csv
 
 # Yext mock: what it was told to change
 data/fonecta-connect-suggests-2026/mock_api/state.json
+
+# Demo video recording: scripts, the baseline database and recordings (see demo-recording/README.md)
+demo-recording/

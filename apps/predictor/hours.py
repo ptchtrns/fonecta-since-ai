@@ -36,6 +36,9 @@ def normal_hours(data, business, day, as_of=None):
         if version["effective_from"] == "before-2024" or version["effective_from"] < as_of:
             published = version
 
+    if published is None:
+        # A business from the team's Yext account has no history here, only the hours Yext shows now.
+        return hours_to_text(business["hours"].get(weekday_of(day)))
     return hours_to_text(published["hours"].get(weekday_of(day)))
 
 
